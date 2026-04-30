@@ -14,9 +14,10 @@ HEADERS = {
     'Referer': 'https://searchtv.net/',
 }
 
-# Session reused across requests for cookie persistence
 session = requests.Session()
 session.headers.update(HEADERS)
+
+M3U_URL_RE = re.compile(r'^(https?://\S+)$')
 
 @app.route('/')
 def index():
@@ -42,7 +43,17 @@ def api_search():
         if resp.status_code != 200:
             return jsonify({'streams': []})
 
-        items = list(resp.json().keys())
+        try:
+            data = resp.json()
+        except ValueError:
+            return jsonify({'streams': []})
+
+        if not isinstance(data, dict) or not data:
+            return jsonify({'streams': []})
+
+        items = list(data.keys())
+        if start_idx >= len(items):
+            return jsonify({'streams': [], 'hasMore': False})
 
         streams = []
         downloaded = 0
@@ -54,26 +65,38 @@ def api_search():
                     f'https://searchtv.net/stream/uuid/{items[i]}/',
                     timeout=5
                 )
-                if 'EXTM3U' in stream_resp.text:
-                    title = str(items[i])
-                    url = ''
-                    for line in stream_resp.text.split('\n'):
-                        if line.startswith('#EXTINF:'):
-                            parts = line.split(',', 1)
-                            if len(parts) > 1:
-                                raw = parts[1].strip().split('==>')[0].strip()
-                                title = re.sub(r'\s*\(\d+\)\s*$', '', raw).strip()
-                        elif line.startswith('http'):
-                            url = line.strip()
-                            break
-                    if url:
-                        streams.append({'title': title, 'url': url})
-                        downloaded += 1
-            except:
+                if stream_resp.status_code != 200:
+                    i += 1
+                    continue
+
+                text = stream_resp.text
+                if '#EXTM3U' not in text:
+                    i += 1
+                    continue
+
+                title = data[items[i]].get('title', items[i])
+                url = ''
+
+                for line in text.splitlines():
+                    if line.startswith('#EXTINF:'):
+                        parts = line.split(',', 1)
+                        if len(parts) > 1:
+                            raw = parts[1].strip().split('==>')[0].strip()
+                            clean = re.sub(r'\s*\(\d+\)\s*$', '', raw).strip()
+                            if clean:
+                                title = clean
+                    elif M3U_URL_RE.match(line.strip()):
+                        url = line.strip()
+                        break
+
+                if url:
+                    streams.append({'title': title, 'url': url})
+                    downloaded += 1
+            except requests.exceptions.RequestException:
                 pass
             i += 1
 
-        streams.sort(key=lambda x: 1 if '1080' in x['title'].lower() or 'hd' in x['title'].lower() else 2)
+        streams.sort(key=lambda x: 0 if re.search(r'1080|4k|uhd', x['title'], re.I) else 1 if re.search(r'720|hd', x['title'], re.I) else 2)
 
         has_more = i < len(items)
 
