@@ -2,10 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SŌF MOJITO TV</title>
 <style>
-*{margin:0;padding:0}
-html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;-webkit-tap-highlight-color:transparent}
 #video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000}
 #menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center}
 .logo{font-size:72px;font-weight:bold;text-align:center;line-height:1}
@@ -14,7 +15,12 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial}
 .logo .tv{color:#ff0000;font-size:32px;vertical-align:top;margin-left:5px;text-shadow:0 0 10px #ff0000}
 #in{font-size:32px;padding:20px;background:transparent;border:none;color:#666;text-align:center;margin-bottom:20px;outline:none;text-shadow:0 0 5px rgba(255,0,0,0.3)}
 #in.focused{color:#aaa;text-shadow:0 0 10px rgba(255,0,0,0.5)}
-#msg{font-size:20px;padding:15px;color:#8b0000;min-height:30px}
+#searchInput{display:none;width:90%;max-width:500px;font-size:18px;padding:12px 16px;background:#1a1a1a;color:#fff;border:1px solid #555;border-radius:8px;margin:10px auto;outline:none}
+#searchInput:focus{border-color:#ff0000}
+#searchInput.visible{display:block}
+#goBtn{display:none;margin:8px auto;padding:12px 30px;background:#8b0000;border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:6px}
+#goBtn.visible{display:block}
+#msg{font-size:20px;padding:15px;color:#8b0000;min-height:30px;text-align:center}
 .error{color:#ff0000}
 .info{color:#dc143c}
 .hidden{display:none}
@@ -22,14 +28,18 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial}
 #qm.show{display:flex}
 #qm h2{color:#ff0000;font-size:48px;margin-bottom:40px;text-shadow:0 0 20px #ff0000,0 0 40px #8b0000}
 #qm p{color:#8b0000;font-size:24px;padding:15px}
-select{font-size:20px;width:100%;padding:15px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:8px;margin-top:20px;height:300px}
-option{background:#1a1a1a;color:#aaa;padding:12px}
+select{font-size:20px;width:100%;max-width:600px;padding:15px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:8px;margin-top:10px;height:300px}
+option{background:#1a1a1a;color:#aaa;padding:12px;min-height:40px}
 option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
+#resultsList{width:100%;max-width:600px;margin-top:10px;display:none}
+.stream-item{padding:14px 16px;border-bottom:1px solid #222;font-size:16px;color:#aaa;cursor:pointer;-webkit-user-select:none;user-select:none}
+.stream-item:active{background:#1a1a1a;color:#fff}
+.stream-item.active{background:#8b0000;color:#fff}
 </style>
 </head>
 <body>
 
-<video id="video" controls></video>
+<video id="video" playsinline webkit-playsinline controls></video>
 
 <div id="qm">
 <h2>SŌF CONTROL</h2>
@@ -42,17 +52,19 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <div id="menu">
 <div class="logo"><span class="sof">SōF</span><span class="mojito"> MoJiTo</span><span class="tv"> TV</span></div>
 <div id="in">Escribe el canal...</div>
-<button id="more" style="display:none;margin-top:10px;padding:10px 20px;background:#8b0000;border:none;color:#fff;cursor:pointer;">MAS STREAMS (+20)</button>
-<button id="touchToggle" style="margin-top:10px;padding:10px 20px;background:#333;border:1px solid #555;color:#aaa;cursor:pointer;border-radius:6px;font-size:14px;">TACTIL: OFF</button>
+<input type="text" id="searchInput" placeholder="Buscar canal..." autocomplete="off" autocapitalize="none">
+<button id="goBtn">BUSCAR</button>
+<button id="more" style="display:none;margin-top:10px;padding:10px 20px;background:#8b0000;border:none;color:#fff;cursor:pointer;border-radius:6px;">MAS STREAMS (+20)</button>
 <div id="msg" class="info">↑↓ navegar | ENTER reproducir</div>
 <select id="results" size="10" class="hidden"></select>
+<div id="resultsList"></div>
 </div>
 
 <script>
 var BASE=window.location.protocol+'//'+window.location.host;
 var API=BASE+'/api/search';
-var streams=[], favorites=[], idx=0, txt='', mode='search', page=1, hasMore=false, loading=false, touchEnabled=false;
-var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video'), elTouchBtn=document.getElementById('touchToggle');
+var streams=[], favorites=[], idx=0, txt='', mode='search', page=1, hasMore=false, loading=false;
+var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video'), elSearchInput=document.getElementById('searchInput'), elGoBtn=document.getElementById('goBtn'), elResultsList=document.getElementById('resultsList');
 
 function log(m,t){elMsg.textContent=m;elMsg.className=t||'info'}
 
@@ -81,6 +93,7 @@ function addFavorite(){
 function showFavorites(){
     mode='favorites';
     elSel.innerHTML='';elSel.classList.remove('hidden');
+    elResultsList.style.display='none';
     if(!favorites.length){log('Sin favoritos');return;}
     favorites.forEach(function(f,i){
         elSel.add(new Option('★ '+f.title.substring(0,60),i));
@@ -126,7 +139,8 @@ function playFav(favIdx){
 function buscar(){
     if(!txt.trim())return;
     log('Buscando...');
-    elSel.innerHTML='';streams=[];page=1;
+    elSel.innerHTML='';elSel.classList.add('hidden');elResultsList.style.display='none';
+    streams=[];page=1;
     loadPage(1);
 }
 
@@ -142,7 +156,6 @@ function loadPage(p){
             try{
                 var d=JSON.parse(x.responseText);
                 showStreams(d.streams||[],d.hasMore,p===1);
-                if(p>1){idx=streams.length-d.streams.length;elSel.selectedIndex=idx;elSel.focus();}
             }catch(e){log('Error');}
         }
     };
@@ -158,15 +171,35 @@ function showStreams(data,more,isFirst){
         var gb=/1080|4k|uhd/i.test(b.title)?3:(/720|hd/i.test(b.title)?2:1);
         return gb-ga;
     });
-    if(isFirst){streams=data;idx=-1;elSel.innerHTML='';elSel.classList.remove('hidden');}
+    if(isFirst){streams=data;idx=-1;elSel.innerHTML='';elResultsList.innerHTML='';}
+    var base=isFirst?0:streams.length;
     data.forEach(function(s,i){
-        var pos=isFirst?i:streams.length;
-        elSel.add(new Option((pos+1)+'. '+s.title.substring(0,50)+ql(s.title),pos));
+        var pos=base+i;
         streams.push(s);
+        if(!isFirst){
+            elSel.add(new Option((pos+1)+'. '+s.title.substring(0,50)+ql(s.title),pos));
+        }
+        var div=document.createElement('div');
+        div.className='stream-item';
+        div.textContent=(pos+1)+'. '+s.title.substring(0,55)+ql(s.title);
+        div.dataset.idx=pos;
+        div.addEventListener('click',function(){
+            idx=pos;
+            playStream(pos);
+        });
+        div.addEventListener('touchend',function(e){
+            e.preventDefault();
+            idx=pos;
+            playStream(pos);
+        });
+        elResultsList.appendChild(div);
     });
+    elResultsList.style.display='block';
+    elSel.classList.add('hidden');
     log(streams.length+' streams'+(hasMore?' - MAS':' - FIN'));
 }
 
+// KEYBOARD CONTROL (remote) - untouched
 document.addEventListener('keydown',function(e){
     var k=e.key;
     if(elVideo.style.display==='block'){
@@ -199,56 +232,58 @@ document.addEventListener('keydown',function(e){
     else if(k==='PageUp'){if(page>1){page--;loadPage(page);}}
 });
 
-elTouchBtn.addEventListener('click',function(){
-    touchEnabled=!touchEnabled;
-    elTouchBtn.textContent='TACTIL: '+(touchEnabled?'ON':'OFF');
-    elTouchBtn.style.background=touchEnabled?'#8b0000':'#333';
-    elTouchBtn.style.color=touchEnabled?'#fff':'#aaa';
-    log(touchEnabled?'Control tactil activado':'Control tactil desactivado');
+// TOUCH: video tap = play/pause, double tap = back
+var videoTapTime=0;
+elVideo.addEventListener('touchend',function(e){
+    var now=Date.now();
+    if(now-videoTapTime<300){
+        elVideo.pause();
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
+    }else{
+        if(elVideo.paused)elVideo.play().catch(function(){});
+        else elVideo.pause();
+    }
+    videoTapTime=now;
 });
 
-elVideo.addEventListener('click',function(){
-    if(!touchEnabled)return;
-    if(elVideo.paused)elVideo.play().catch(function(){});
-    else elVideo.pause();
+// TOUCH: search input for mobile
+elGoBtn.addEventListener('click',function(){
+    txt=elSearchInput.value;
+    renderIn();
+    buscar();
 });
 
-elVideo.addEventListener('dblclick',function(){
-    if(!touchEnabled)return;
-    elVideo.pause();
-    elVideo.style.display='none';
-    elMenu.style.display='flex';
-});
+elSearchInput.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+        txt=elSearchInput.value;
+renderIn();
 
-elSel.addEventListener('click',function(e){
-    if(!touchEnabled)return;
-    var opt=e.target;
-    while(opt.tagName!=='OPTION'&&opt.tagName!=='SELECT')opt=opt.parentNode;
-    if(opt.tagName==='OPTION'){
-        var i=opt.index;
-        idx=i;
-        if(mode==='favorites'&&favorites[i])playFav(i);
-        else if(mode==='search'&&streams[i])playStream(i);
+if('ontouchstart' in window||navigator.maxTouchPoints){
+    elSearchInput.classList.add('visible');
+    elGoBtn.classList.add('visible');
+}
+        buscar();
     }
 });
 
-var touchStartY=0;
-elSel.addEventListener('touchstart',function(e){
-    if(!touchEnabled)return;
-    touchStartY=e.touches[0].clientY;
+// Select click for select-based navigation (fallback)
+elSel.addEventListener('change',function(){
+    idx=parseInt(elSel.value);
+    if(mode==='favorites'&&favorites[idx])playFav(idx);
+    else if(mode==='search'&&streams[idx])playStream(idx);
 });
 
-elSel.addEventListener('touchend',function(e){
-    if(!touchEnabled)return;
-    var dy=e.changedTouches[0].clientY-touchStartY;
-    if(dy<-30){
-        e.preventDefault();
-        var lim=mode==='search'&&txt.length>0?streams.length-1:favorites.length-1;
-        if(idx<lim){idx++;elSel.selectedIndex=idx;elSel.focus();log((mode==='search'?streams[idx]:favorites[idx]).title.substring(0,40));}
-        else if(mode==='search'&&hasMore){page++;loadPage(page);log('Cargando mas...');}
-    }else if(dy>30){
-        e.preventDefault();
-        if(idx>0){idx--;elSel.selectedIndex=idx;elSel.focus();log((mode==='search'?streams[idx]:favorites[idx]).title.substring(0,40));}
+// Swipe on resultsList for load more
+var listStartY=0;
+elResultsList.addEventListener('touchstart',function(e){
+    listStartY=e.touches[0].clientY;
+});
+
+elResultsList.addEventListener('touchend',function(e){
+    var dy=e.changedTouches[0].clientY-listStartY;
+    if(dy<-80&&hasMore&&mode==='search'){
+        page++;loadPage(page);log('Cargando mas...');
     }
 });
 
