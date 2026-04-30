@@ -6,9 +6,14 @@
 <title>SŌF MOJITO TV</title>
 <style>
 *{margin:0;padding:0}
-html,body{width:100%;height:100%;background:#000 url('https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUycmx2bTBtOWdybGoybWJ3Nmw3ZTRqZjV6azJhM3Fkb25xMHY2ZDV5byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1U9pq0QDGiEEmTzG3D/giphy.gif') center center/cover no-repeat fixed;color:#fff;font-family:Arial}
-#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000}
-#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center;background:rgba(0,0,0,0.55)}
+html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;overflow:hidden}
+#bg1,#bg2{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;background-repeat:no-repeat;z-index:0}
+#bg1{background-image:url('https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUycmx2bTBtOWdybGoybWJ3Nmw3ZTRqZjV6azJhM3Fkb25xMHY2ZDV5byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1U9pq0QDGiEEmTzG3D/giphy.gif');opacity:1;animation:bgFade 30s infinite}
+#bg2{background-image:url('https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjR2djg3YWtyY3dvaGR2bWp5bHVhbDlyaWwzbWV6eWswczZwYW9xbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vRjILNceM6FEPHW/giphy.gif');opacity:0;animation:bgFade2 30s infinite}
+@keyframes bgFade{0%,40%{opacity:1}50%,100%{opacity:0}}
+@keyframes bgFade2{0%,40%{opacity:0}50%,100%{opacity:1}}
+#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000;z-index:1}
+#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2}
 .logo{font-size:72px;font-weight:bold;text-align:center;line-height:1}
 .logo .sof{color:#8b0000;text-shadow:0 0 10px #ff0000,0 0 20px #8b0000}
 .logo .mojito{color:#dc143c;text-shadow:0 0 10px #ff0000,0 0 20px #dc143c}
@@ -19,7 +24,7 @@ html,body{width:100%;height:100%;background:#000 url('https://media3.giphy.com/m
 .error{color:#ff0000}
 .info{color:#dc143c}
 .hidden{display:none}
-#qm{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000 url('https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjR2djg3YWtyY3dvaGR2bWp5bHVhbDlyaWwzbWV6eWswczZwYW9xbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vRjILNceM6FEPHW/giphy.gif') center center/cover no-repeat fixed;z-index:200;flex-direction:column;justify-content:center;align-items:center}
+#qm{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;flex-direction:column;justify-content:center;align-items:center}
 #qm.show{display:flex}
 #qm h2{color:#ff0000;font-size:48px;margin-bottom:40px;text-shadow:0 0 20px #ff0000,0 0 40px #8b0000}
 #qm p{color:#8b0000;font-size:24px;padding:15px}
@@ -32,6 +37,9 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 </style>
 </head>
 <body>
+
+<div id="bg1"></div>
+<div id="bg2"></div>
 
 <video id="video" playsinline webkit-playsinline controls></video>
 
