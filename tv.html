@@ -212,6 +212,12 @@ if('ontouchstart' in window||navigator.maxTouchPoints){
     elMobileInput.addEventListener('keydown',function(e){
         if(e.key==='Enter'){e.preventDefault();buscar();elMobileInput.blur();}
     });
+    elSel.addEventListener('change',function(){
+        var i=parseInt(elSel.value);
+        idx=i;
+        if(mode==='favorites'&&favorites[i])playFav(i);
+        else if(mode==='search'&&streams[i])playStream(i);
+    });
 }
 
 renderIn();
