@@ -254,7 +254,7 @@ setInterval(function(){
 var incoming=pickBg();
 if(activeBg==='bg1'){elBg2.style.backgroundImage='url('+incoming+')';elBg2.style.opacity='1';elBg1.style.opacity='0';activeBg='bg2';}
 else{elBg1.style.backgroundImage='url('+incoming+')';elBg1.style.opacity='1';elBg2.style.opacity='0';activeBg='bg1';}
-},15000);
+},5000);
         idx=-1;elSel.innerHTML='';
     });
     elMobileInput.addEventListener('keydown',function(e){
