@@ -7,7 +7,6 @@
 *{margin:0;padding:0}
 html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 #bg{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;z-index:0}
-#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000;z-index:1}
 #menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2}
 .logo{font-size:72px;font-weight:bold;text-align:center;line-height:1}
 .logo .sof{color:#8b0000;text-shadow:0 0 10px #ff0000,0 0 20px #8b0000}
@@ -30,7 +29,6 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 </head>
 <body>
 <div id="bg"></div>
-<video id="video" controls></video>
 <div id="qm">
 <h2>SŌF CONTROL</h2>
 <p>▶ ENTER: siguiente | ◀ ARRIBA: anterior</p>
@@ -49,19 +47,38 @@ API=BASE+'/api/search',
 streams=[],favorites=[],idx=0,txt='',mode='search',page=1,hasMore=false,loading=false,
 playingFav=false,playingIdx=-1,
 elIn=document.getElementById('in'),elSel=document.getElementById('results'),elMsg=document.getElementById('msg'),
-elMenu=document.getElementById('menu'),elVideo=document.getElementById('video'),elMore=document.getElementById('more'),
-videoTimeout=null;
+elMenu=document.getElementById('menu'),elMore=document.getElementById('more'),elQm=document.getElementById('qm'),
+videoEl=null,videoTimeout=null;
+
+function getVideo(){
+    if(!videoEl||!videoEl.parentNode){
+        videoEl=document.createElement('video');
+        videoEl.id='video';videoEl.setAttribute('controls','');
+        videoEl.style.cssText='width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000;z-index:1';
+        document.body.insertBefore(videoEl,elMenu);
+    }
+    return videoEl;
+}
 
 function log(m,t){elMsg.textContent=m;elMsg.className=t||'info'}
 function ql(t){return /1080|4k|uhd/i.test(t)?' [1080p]':/720|hd/i.test(t)?' [HD]':/480|sd/i.test(t)?' [SD]':''}
 function renderIn(){elIn.textContent=txt||'Escribe el canal...'}
 function setMode(m){mode=m;elIn.classList.toggle('focused',m==='search');elSel.classList.toggle('hidden',m==='search');elMore.style.display='none'}
 function clearVideoTimeout(){if(videoTimeout){clearTimeout(videoTimeout);videoTimeout=null}}
-function resetVideo(){clearVideoTimeout();elVideo.pause();elVideo.src='';elVideo.removeAttribute('src');elVideo.load();elVideo.onplaying=null;elVideo.onerror=null;elVideo.oncanplay=null}
+
+function destroyVideo(){
+    clearVideoTimeout();
+    if(videoEl&&videoEl.parentNode){videoEl.pause();videoEl.src='';videoEl.removeAttribute('src');videoEl.remove();}
+    videoEl=null;
+}
+
 function scrollToSel(){var s=elSel.selectedOptions[0];if(s)s.scrollIntoView({block:'nearest'})}
 function sortStreams(){streams.sort(function(a,b){var ga=/1080|4k|uhd/i.test(a.title)?3:/720|hd/i.test(a.title)?2:1,gb=/1080|4k|uhd/i.test(b.title)?3:/720|hd/i.test(b.title)?2:1;return gb-ga})}
 
-function closeVideo(){resetVideo();elVideo.style.display='none';elMenu.style.display='flex'}
+function closeVideo(){
+    destroyVideo();
+    elMenu.style.display='flex';
+}
 
 function addFavorite(){
     var s=mode==='search'?streams[idx]:null;
@@ -74,38 +91,28 @@ function showFavorites(){
     setMode('favorites');elSel.innerHTML='';elSel.classList.remove('hidden');
     if(!favorites.length){log('Sin favoritos');return}
     favorites.forEach(function(f,i){elSel.add(new Option('★ '+f.title.substring(0,60),i))});
-    idx=0;elSel.selectedIndex=0;scrollToSel();log(favorites.length+' favoritos');
+    idx=0;elSel.selectedIndex=0;log(favorites.length+' favoritos');
 }
 
-function playStream(i){
-    playingFav=false;playingIdx=i;
-    var s=streams[i];if(!s)return;
-    resetVideo();
-    log('▶ '+s.title.substring(0,40));
-    elVideo.style.display='block';elMenu.style.display='none';
-    elVideo.src=s.url;
-    elVideo.onerror=function(){elVideo.onerror=null;clearVideoTimeout();log('✗ Falló – elige otro','error');closeVideo()};
-    elVideo.onplaying=function(){elVideo.onplaying=null;clearVideoTimeout();log('✓ '+s.title.substring(0,40))};
-    elVideo.oncanplay=function(){elVideo.oncanplay=null;elVideo.play().catch(function(){})};
-    elVideo.play().catch(function(){});
-    videoTimeout=setTimeout(function(){if(elVideo.readyState<2){log('✗ Timeout – elige otro','error');closeVideo()}},20000);
+function startPlay(url,title,isFav,streamIdx){
+    playingFav=isFav;playingIdx=streamIdx;
+    destroyVideo();
+    var v=getVideo();
+    log('▶ '+title.substring(0,40));
+    v.style.display='block';elMenu.style.display='none';
+    v.src=url;
+    v.onerror=function(){v.onerror=null;clearVideoTimeout();log('✗ Falló – elige otro','error');closeVideo()};
+    v.onplaying=function(){v.onplaying=null;clearVideoTimeout();log('✓ '+title.substring(0,40))};
+    v.play().catch(function(){});
+    videoTimeout=setTimeout(function(){if(!v.parentNode||v.readyState<2){log('✗ Timeout – elige otro','error');closeVideo()}},20000);
 }
 
-function playFav(i){
-    playingFav=true;playingIdx=i;
-    var f=favorites[i];if(!f)return;
-    resetVideo();
-    log('▶ '+f.title.substring(0,40));
-    elVideo.style.display='block';elMenu.style.display='none';
-    elVideo.src=f.url;
-    elVideo.onerror=function(){elVideo.onerror=null;clearVideoTimeout();log('✗ Falló – elige otro','error');closeVideo()};
-    elVideo.onplaying=function(){elVideo.onplaying=null;clearVideoTimeout();log('✓ '+f.title.substring(0,40))};
-    elVideo.oncanplay=function(){elVideo.oncanplay=null;elVideo.play().catch(function(){})};
-    elVideo.play().catch(function(){});
-    videoTimeout=setTimeout(function(){if(elVideo.readyState<2){log('✗ Timeout – elige otro','error');closeVideo()}},20000);
-}
+function playStream(i){if(!streams[i])return;startPlay(streams[i].url,streams[i].title,false,i)}
+function playFav(i){if(!favorites[i])return;startPlay(favorites[i].url,favorites[i].title,true,i)}
 
-function buscar(){if(!txt.trim())return;log('Buscando...');elSel.innerHTML='';elSel.classList.add('hidden');streams=[];page=1;hasMore=false;elMore.style.display='none';loadPage(1)}
+function resetResults(){elSel.innerHTML='';elSel.classList.add('hidden');streams=[];hasMore=false;elMore.style.display='none'}
+
+function buscar(){if(!txt.trim())return;log('Buscando...');resetResults();page=1;loadPage(1)}
 
 function loadPage(p){
     if(loading)return;loading=true;log('Cargando...');
@@ -117,9 +124,8 @@ function loadPage(p){
         if(x.status===200){
             try{
                 var d=JSON.parse(x.responseText);
-                var data=d.streams||[],more=!!d.hasMore;
-                showStreams(data,more,p===1);
-                if(p>1){idx=streams.length-data.length;elSel.selectedIndex=idx;scrollToSel()}
+                showStreams(d.streams||[],!!d.hasMore,p===1);
+                if(p>1){idx=streams.length-(d.streams||[]).length;elSel.selectedIndex=idx;scrollToSel()}
             }catch(e){log('Error al parsear','error')}
         }else{log('Error del servidor','error')}
     };
@@ -140,41 +146,28 @@ function showStreams(data,more,isFirst){
 }
 
 document.addEventListener('keydown',function(e){
-    var k=e.key;
-    if(elVideo.style.display==='block'){
+    var k=e.key,v=getVideo();
+    if(v&&v.style.display==='block'){
         if(k==='Escape'){closeVideo();log('Cerrado')}
-        else if(k===' '){e.preventDefault();if(elVideo.paused)elVideo.play().catch(function(){});else elVideo.pause()}
-        else if(k==='ArrowRight'){
-            e.preventDefault();
-            if(playingFav){if(playingIdx<favorites.length-1)playFav(playingIdx+1);else log('Fin favoritos')}
-            else{var n=playingIdx+1;n<streams.length?playStream(n):log('Fin lista')}
-        }
-        else if(k==='ArrowLeft'){
-            e.preventDefault();
-            if(playingFav){if(playingIdx>0)playFav(playingIdx-1);else log('Inicio favoritos')}
-            else{var p=playingIdx-1;p>=0?playStream(p):log('Inicio lista')}
-        }
+        else if(k===' '){e.preventDefault();if(v.paused)v.play().catch(function(){});else v.pause()}
+        else if(k==='ArrowRight'){e.preventDefault();if(playingFav){if(playingIdx<favorites.length-1)playFav(playingIdx+1);else log('Fin favoritos')}else{var n=playingIdx+1;n<streams.length?playStream(n):log('Fin lista')}}
+        else if(k==='ArrowLeft'){e.preventDefault();if(playingFav){if(playingIdx>0)playFav(playingIdx-1);else log('Inicio favoritos')}else{var p=playingIdx-1;p>=0?playStream(p):log('Inicio lista')}}
         return;
     }
     if(k==='ArrowDown'){
         e.preventDefault();
-        var list=mode==='favorites'?favorites:streams;
-        var lim=list.length-1;
+        var list=mode==='favorites'?favorites:streams,lim=list.length-1;
         if(idx<lim){idx++;elSel.value=idx;elSel.selectedIndex=idx;scrollToSel();log(list[idx].title.substring(0,40))}
         else if(mode==='search'&&hasMore){page++;loadPage(page)}
     }
     else if(k==='ArrowUp'){e.preventDefault();if(idx>0){idx--;elSel.value=idx;elSel.selectedIndex=idx;scrollToSel();log((mode==='favorites'?favorites:streams)[idx].title.substring(0,40))}}
-    else if(k==='Enter'){
-        e.preventDefault();
-        if(mode==='favorites'){if(favorites[idx])playFav(idx)}
-        else if(mode==='search'){if(txt.length>0&&idx>=0&&streams[idx])playStream(idx);else buscar()}
-    }
-    else if(k==='Backspace'){txt=txt.slice(0,-1);renderIn();idx=-1;elSel.innerHTML='';elSel.classList.add('hidden');streams=[];hasMore=false;elMore.style.display='none'}
+    else if(k==='Enter'){e.preventDefault();if(mode==='favorites'){if(favorites[idx])playFav(idx)}else if(mode==='search'){if(txt.length>0&&idx>=0&&streams[idx])playStream(idx);else buscar()}}
+    else if(k==='Backspace'){txt=txt.slice(0,-1);renderIn();idx=-1;resetResults()}
     else if(k.length===1){txt+=k;renderIn()}
-    else if(k==='F1'){e.preventDefault();document.getElementById('qm').classList.toggle('show')}
+    else if(k==='F1'){e.preventDefault();elQm.classList.toggle('show')}
     else if(k==='f'||k==='F'){if(mode==='search'&&streams[idx])addFavorite()}
     else if(k==='s'||k==='S'){showFavorites()}
-    else if(k==='Home'){txt='';renderIn();setMode('search');elSel.innerHTML='';elSel.classList.add('hidden');streams=[];idx=-1;hasMore=false;elMore.style.display='none'}
+    else if(k==='Home'){txt='';renderIn();setMode('search');resetResults();idx=-1}
     else if(k==='PageDown'){if(hasMore&&!loading){page++;loadPage(page)}}
     else if(k==='PageUp'){if(page>1&&!loading){page--;loadPage(page)}}
 });
