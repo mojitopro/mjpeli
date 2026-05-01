@@ -34,35 +34,54 @@ def api_player():
     if not url:
         return 'Missing URL', 400
     safe_url = url.replace('"', '\\"').replace("'", "\\'")
+    proxy = '/stream?url=' + urllib.parse.quote(url, safe='')
     return '''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>SŌF MOJITO TV</title>
-<style>
-*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}
-#player{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000}
-video{width:100%;height:100%;background:#000;object-fit:contain}
-#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.8);color:#fff;padding:10px 15px;border-radius:8px;font-size:16px;cursor:pointer;border:none}
-#status{color:#fff;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;pointer-events:none}
-</style></head><body>
-<div id="player"><div id="status">Cargando...</div><video id="v" playsinline webkit-playsinline controls></video></div>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;background:#000}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
+<video id="v" playsinline webkit-playsinline controls autoplay></video>
 <button id="back" onclick="history.back()">← Volver</button>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>
-var u="''' + safe_url + '''";
-var v=document.getElementById("v"), s=document.getElementById("status");
-v.style.display='none';
-function ok(){s.style.display='none';v.style.display='block';v.play().catch(function(){})}
+var u="''' + safe_url + '''",p="''' + proxy + '''",v=document.getElementById("v"),tried=false;
+function go(src){if(tried)return;tried=true;v.src=src;v.play().catch(function(){})}
 if(typeof Hls!=="undefined"&&Hls.isSupported()){
-    var h=new Hls({maxBufferLength:30,startLevel:-1});
-    h.loadSource(u);h.attachMedia(v);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){ok()});
+    var h=new Hls({maxBufferLength:60,capLevelToPlayerSize:true});
+    h.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
     h.on(Hls.Events.ERROR,function(e,d){
-        if(d.fatal){h.destroy();if(d.type===Hls.ErrorTypes.NETWORK_ERROR)h.loadSource(u);
-        else{v.src=u;ok()}}
+        if(d.fatal){h.destroy();if(!tried)go(p)}
     });
-}else if(v.canPlayType('application/vnd.apple.mpegurl')){
-    v.src=u;v.addEventListener('loadedmetadata',function(){ok()});
-}else{v.src=u;ok()}
+    h.loadSource(p);h.attachMedia(v);
+}else{go(p)}
 </script></body></html>'''
+
+@app.route('/stream')
+def api_stream():
+    url = request.args.get('url', '')
+    if not url:
+        return 'Missing URL', 400
+    try:
+        r = session.get(url, timeout=30, headers={'Referer': 'https://searchtv.net/'})
+        if r.status_code != 200:
+            return 'Stream error', r.status_code
+        ct = r.headers.get('Content-Type', '')
+        if 'mpegurl' in ct or 'm3u8' in ct or 'x-mpegurl' in ct:
+            base = url.rsplit('/', 1)[0] + '/'
+            def rewrite(line):
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    return line
+                if line.startswith('http'):
+                    return '/stream?url=' + urllib.parse.quote(line, safe='')
+                return '/stream?url=' + urllib.parse.quote(base + line, safe='')
+            body = '\n'.join(rewrite(l) for l in r.text.splitlines())
+            return Response(body, mimetype='application/vnd.apple.mpegurl')
+        def gen():
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        return Response(gen(), mimetype=ct)
+    except Exception:
+        return 'Stream error', 500
 
 @app.route('/api/search')
 def api_search():
