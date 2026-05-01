@@ -42,7 +42,7 @@ def api_search():
     try:
         resp = session.get(
             f'https://searchtv.net/search/?query={urllib.parse.quote(q)}',
-            timeout=15
+            timeout=60
         )
 
         if resp.status_code != 200:
@@ -68,7 +68,7 @@ def api_search():
             try:
                 stream_resp = session.get(
                     f'https://searchtv.net/stream/uuid/{items[i]}/',
-                    timeout=10
+                    timeout=30
                 )
                 if stream_resp.status_code != 200:
                     i += 1
