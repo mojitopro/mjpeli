@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SŌF MOJITO TV</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+#bg{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;z-index:0}
+#player{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:100;display:none;flex-direction:column}
+#player.show{display:flex}
+#player video{flex:1;width:100%;background:#000}
+#player .topBar{height:44px;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:space-between;padding:0 10px}
+#player .topBar span{color:#fff;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#player .topBar button{color:#ff0000;background:none;border:none;font-size:24px;width:40px;height:40px}
+#header{padding:15px;background:linear-gradient(180deg,#1a0000 0%,#000 100%);position:relative;z-index:2}
+#header h1{text-align:center;font-size:28px;color:#ff0000;text-shadow:0 0 10px #8b0000}
+#searchRow{display:flex;gap:8px;margin-top:10px}
+#search{flex:1;padding:12px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:8px;font-size:16px;outline:none}
+#search:focus{border-color:#ff0000}
+#btnSearch{padding:12px 20px;background:#8b0000;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+#tabs{display:flex;gap:0;margin-top:10px}
+#tabs button{flex:1;padding:10px;background:#111;color:#888;border:1px solid #333;font-size:14px;cursor:pointer}
+#tabs button:first-child{border-radius:8px 0 0 8px}
+#tabs button:last-child{border-radius:0 8px 8px 0}
+#tabs button.active{background:#8b0000;color:#fff;border-color:#ff0000}
+#listWrap{flex:1;overflow-y:auto;padding:10px;position:relative;z-index:2}
+#list{list-style:none}
+#list li{padding:14px 16px;background:rgba(20,0,0,0.6);border-radius:8px;margin-bottom:8px;border:1px solid #2a0000;cursor:pointer}
+#list li:active{background:#8b0000}
+#list li .t{font-size:15px;color:#fff}
+#list li .q{font-size:12px;color:#8b0000;margin-top:4px}
+#msg{text-align:center;padding:15px;color:#dc143c;font-size:14px}
+#moreBtn{display:block;width:90%;margin:10px auto;padding:14px;background:#8b0000;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div id="player">
+<div class="topBar">
+<button id="btnClose">&#10005;</button>
+<span id="nowPlaying">-</span>
+<button id="btnFav">☆</button>
+</div>
+<video id="vid" playsinline webkit-playsinline controls></video>
+</div>
+
+<div id="header">
+<h1>SōF MoJiTo TV</h1>
+<div id="searchRow">
+<input type="search" id="search" placeholder="Buscar canal..." autocomplete="off">
+<button id="btnSearch">Buscar</button>
+</div>
+<div id="tabs">
+<button id="tabSearch" class="active">Búsqueda</button>
+<button id="tabFav">Favoritos ★</button>
+</div>
+</div>
+
+<div id="listWrap">
+<div id="msg">Escribe y busca un canal</div>
+<ul id="list" class="hidden"></ul>
+<button id="moreBtn" class="hidden">MAS STREAMS (+50)</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+var BASE=window.location.protocol+'//'+window.location.host,
+API=BASE+'/api/search',
+streams=[],favorites=[],idx=-1,txt='',page=1,hasMore=false,loading=false,showingFavs=false,
+currentFav=false,currentIdx=-1,
+hls=null,
+list=document.getElementById('list'),msg=document.getElementById('msg'),
+moreBtn=document.getElementById('moreBtn'),
+search=document.getElementById('search'),
+player=document.getElementById('player'),
+vid=document.getElementById('vid'),
+nowP=document.getElementById('nowPlaying'),
+btnFav=document.getElementById('btnFav'),
+videoTimeout=null;
+
+function clearVideoTimeout(){if(videoTimeout){clearTimeout(videoTimeout);videoTimeout=null}}
+function destroyHls(){if(hls){hls.destroy();hls=null}clearVideoTimeout()}
+
+function play(url,title,isFav,i){
+    destroyHls();
+    currentFav=isFav;currentIdx=i;
+    nowP.textContent=title;
+    btnFav.textContent=favorites.some(function(f){return f.url===url})?'★':'☆';
+    player.classList.add('show');
+    if(typeof Hls!=='undefined'&&Hls.isSupported()){
+        hls=new Hls({maxBufferLength:30,maxMaxBufferLength:60});
+        hls.loadSource(url);
+        hls.attachMedia(vid);
+        hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){})});
+        hls.on(Hls.Events.ERROR,function(ev,data){
+            if(data.fatal){destroyHls();vid.pause();log('✗ Falló – prueba otro');player.classList.remove('show')}
+        });
+    }else{
+        vid.src=url;vid.play().catch(function(){});
+    }
+    vid.onerror=function(){destroyHls();log('✗ Falló – prueba otro');player.classList.remove('show')};
+    vid.onplaying=function(){vid.onplaying=null;clearVideoTimeout()};
+    videoTimeout=setTimeout(function(){if(!hls&&vid.readyState<2){log('✗ Timeout');player.classList.remove('show')}},20000);
+}
+
+function closePlayer(){destroyHls();vid.src='';vid.pause();player.classList.remove('show')}
+
+document.getElementById('btnClose').addEventListener('click',closePlayer);
+btnFav.addEventListener('click',function(){
+    var url=currentFav?favorites[currentIdx].url:streams[currentIdx].url;
+    var title=currentFav?favorites[currentIdx].title:streams[currentIdx].title;
+    var exists=favorites.findIndex(function(f){return f.url===url});
+    if(exists>=0){favorites.splice(exists,1);btnFav.textContent='☆'}
+    else{favorites.push({title:title,url:url});btnFav.textContent='★';log('★ Guardado')}
+});
+
+function log(m){msg.textContent=m}
+
+function ql(t){return /1080|4k|uhd/i.test(t)?'1080p':/720|hd/i.test(t)?'HD':/480|sd/i.test(t)?'SD':''}
+
+function sortStreams(){streams.sort(function(a,b){var ga=/1080|4k|uhd/i.test(a.title)?3:/720|hd/i.test(a.title)?2:1,gb=/1080|4k|uhd/i.test(b.title)?3:/720|hd/i.test(b.title)?2:1;return gb-ga})}
+
+function renderList(items,isFav){
+    list.innerHTML='';
+    items.forEach(function(s,i){
+        var li=document.createElement('li');
+        var q=ql(s.title);
+        li.innerHTML='<div class="t">'+(i+1)+'. '+s.title.substring(0,50)+'</div>'+(q?'<div class="q">'+q+'</div>':'');
+        li.addEventListener('click',function(){play(s.url,s.title,isFav,i)});
+        list.appendChild(li);
+    });
+    list.classList.remove('hidden');
+    msg.classList.add('hidden');
+}
+
+function loadResults(data,more,isFirst){
+    if(!data||!data.length){if(isFirst){log('Sin resultados');msg.classList.remove('hidden')}return}
+    hasMore=more;
+    if(isFirst){streams=data;idx=-1;sortStreams()}
+    else{data.forEach(function(s){streams.push(s)});sortStreams()}
+    renderList(streams,false);
+    log(streams.length+' streams'+(hasMore?' - hay más':' - fin'));
+    if(hasMore)moreBtn.classList.remove('hidden');else moreBtn.classList.add('hidden');
+}
+
+function doSearch(){
+    txt=search.value.trim();
+    if(!txt)return;
+    log('Buscando...');msg.classList.remove('hidden');list.classList.add('hidden');moreBtn.classList.add('hidden');
+    streams=[];page=1;hasMore=false;idx=-1;
+    loadPage(1);
+}
+
+function loadPage(p){
+    if(loading)return;loading=true;log('Cargando...');
+    var x=new XMLHttpRequest();
+    x.open('GET',API+'?q='+encodeURIComponent(txt)+'&page='+p,true);
+    x.timeout=30000;
+    x.onload=function(){
+        loading=false;
+        if(x.status===200){
+            try{
+                var d=JSON.parse(x.responseText);
+                loadResults(d.streams||[],!!d.hasMore,p===1);
+            }catch(e){log('Error')}
+        }else{log('Error del servidor')}
+    };
+    x.onerror=function(){loading=false;log('Sin conexion')};
+    x.ontimeout=function(){loading=false;log('Timeout')};
+    x.send();
+}
+
+document.getElementById('btnSearch').addEventListener('click',doSearch);
+search.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();doSearch()}});
+moreBtn.addEventListener('click',function(){if(hasMore&&!loading){page++;loadPage(page);this.classList.add('hidden')}});
+
+document.getElementById('tabSearch').addEventListener('click',function(){
+    showingFavs=false;
+    this.classList.add('active');document.getElementById('tabFav').classList.remove('active');
+    if(streams.length)renderList(streams,false);else{msg.classList.remove('hidden');list.classList.add('hidden')}
+});
+document.getElementById('tabFav').addEventListener('click',function(){
+    showingFavs=true;
+    this.classList.add('active');document.getElementById('tabSearch').classList.remove('active');
+    if(favorites.length)renderList(favorites,true);else{log('Sin favoritos');msg.classList.remove('hidden');list.classList.add('hidden')}
+});
+
+// Bg
+var bgs=['https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUydjQyOXRoYjM2a3JydGZ0Zm42azZydnI3ZnJ1ZHFrZXJ5aW9iOHFiMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/riw3K0D2h4klG/giphy.gif','https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyNGJwdW00b2RrcnIyenY3Ymh3ZGZ3Y3h0Y2IyeWdvdGxob3BmeW9hYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QuPrp3BI6cMe2lErCb/giphy.gif','https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyMXd3enBqODk2dHVnZmY2MGFuNmJpYW5tZXAzam4zaWx5bjl1dDRnMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VLzbEtlbwJUFljcRbf/giphy.gif','https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUyaWFzbzRuZnI4bmFwcWN5Z2kyZXViNnNsang1cWx5NDlydDgwamp6bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/DoiNV6NO73U5DVq1vA/giphy.gif','https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUydzB6bGVjZnhidXhhdTk3emhndjc0MzNpanBrZ3NpOHp2cDNhbTVnMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1oSbCb9ZhC7MvQBd3s/giphy.gif','https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjJ5dWI4NW95bHk1NXRyZWkwaTMwdGdkOWU3dW1qYjkwc3N4ZmlucCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TIEh1VS5EYQt5QbODH/giphy.gif','https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyd202emhrcjM5NHN6czNjYWk2MGh3bTFyb3RnOXJjOGFnYmNvZXNycCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/J1KaQ7nz8P0L3O15L7/giphy.gif','https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyYnhsZWEyejh2cHM3bzhubnkzNXEzbnNzbDhsMm4xZjVpZTlnZWM1OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/muzaYMXAENjiw/giphy.gif'];
+for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=bgs[i];bgs[i]=bgs[j];bgs[j]=t}
+var bgIdx=0,bgEl=document.getElementById('bg');
+function nextBg(){if(bgIdx>=bgs.length){for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=bgs[i];bgs[i]=bgs[j];bgs[j]=t}bgIdx=0}return bgs[bgIdx++]}
+bgEl.style.backgroundImage='url('+nextBg()+')';
+setInterval(function(){bgEl.style.backgroundImage='url('+nextBg()+')'},8000);
+</script>
+</body>
+</html>
