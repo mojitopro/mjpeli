@@ -36,7 +36,7 @@ def api_search():
     if not q:
         return jsonify({'streams': []})
 
-    limit = 20
+    limit = 50
     start_idx = (page - 1) * limit
 
     try:
