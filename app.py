@@ -18,12 +18,13 @@ session = requests.Session()
 session.headers.update(HEADERS)
 
 M3U_URL_RE = re.compile(r'^(https?://\S+)$')
-MOBILE_RE = re.compile(r'Mobi|Android|iPhone|iPad|iPod|webOS|BlackBerry', re.I)
+MOBILE_RE = re.compile(r'Mobi|Android|iPhone|iPad|iPod|webOS|BlackBerry|Opera Mini|IEMobile|Touch|Silk', re.I)
 
 @app.route('/')
 def index():
     ua = request.headers.get('User-Agent', '')
-    if MOBILE_RE.search(ua):
+    w = request.args.get('w', '')
+    if MOBILE_RE.search(ua) or w == 'm':
         return send_file(os.path.join(os.path.dirname(__file__), 'mobile.html'))
     return send_file(os.path.join(os.path.dirname(__file__), 'tv.html'))
 
