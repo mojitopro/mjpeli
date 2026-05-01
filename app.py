@@ -28,6 +28,27 @@ def index():
         return send_file(os.path.join(os.path.dirname(__file__), 'mobile.html'))
     return send_file(os.path.join(os.path.dirname(__file__), 'tv.html'))
 
+@app.route('/player')
+def api_player():
+    url = request.args.get('url', '')
+    if not url:
+        return 'Missing URL', 400
+    return '''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>SŌF MOJITO TV</title>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;object-fit:contain;background:#000}</style>
+</head><body><video id="v" playsinline webkit-playsinline controls></video>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>
+var u="''' + url.replace('"', '\\"') + '''";
+var v=document.getElementById("v");
+if(typeof Hls!=="undefined"&&Hls.isSupported()){
+    var h=new Hls({maxBufferLength:30});
+    h.loadSource(u);h.attachMedia(v);
+    h.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
+    h.on(Hls.Events.ERROR,function(e,d){if(d.fatal){h.destroy();v.src=u;v.play().catch(function(){})}});
+}else{v.src=u;v.play().catch(function(){})}
+</script></body></html>'''
+
 @app.route('/stream')
 def api_stream():
     url = request.args.get('url', '')
