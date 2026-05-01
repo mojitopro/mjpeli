@@ -62,6 +62,7 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <script>
 var BASE=window.location.protocol+'//'+window.location.host;
 var API=BASE+'/api/search';
+var isMobile=('ontouchstart' in window||navigator.maxTouchPoints||/Mobi|Android/i.test(navigator.userAgent));
 var streams=[], favorites=[], idx=0, txt='', mode='search', page=1, hasMore=false, loading=false;
 var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video'), elMobileInput=document.getElementById('mobileInput'), elMore=document.getElementById('more');
 
