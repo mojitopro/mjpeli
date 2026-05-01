@@ -8,12 +8,6 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
 #bg{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;z-index:0}
-#player{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:100;display:none;flex-direction:column}
-#player.show{display:flex}
-#player video{flex:1;width:100%;background:#000}
-#player .topBar{height:44px;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:space-between;padding:0 10px}
-#player .topBar span{color:#fff;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#player .topBar button{color:#ff0000;background:none;border:none;font-size:24px;width:40px;height:40px}
 #header{padding:15px;background:linear-gradient(180deg,#1a0000 0%,#000 100%);position:relative;z-index:2}
 #header h1{text-align:center;font-size:28px;color:#ff0000;text-shadow:0 0 10px #8b0000}
 #searchRow{display:flex;gap:8px;margin-top:10px}
@@ -25,10 +19,9 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sa
 #tabs button:first-child{border-radius:8px 0 0 8px}
 #tabs button:last-child{border-radius:0 8px 8px 0}
 #tabs button.active{background:#8b0000;color:#fff;border-color:#ff0000}
-#listWrap{flex:1;overflow-y:auto;padding:10px;position:relative;z-index:2}
+#listWrap{flex:1;overflow-y:auto;padding:10px;position:relative;z-index:2;-webkit-overflow-scrolling:touch}
 #list{list-style:none}
-#list li{padding:14px 16px;background:rgba(20,0,0,0.6);border-radius:8px;margin-bottom:8px;border:1px solid #2a0000;cursor:pointer}
-#list li:active{background:#8b0000}
+#list li{padding:14px 16px;background:rgba(20,0,0,0.6);border-radius:8px;margin-bottom:8px;border:1px solid #2a0000}
 #list li .t{font-size:15px;color:#fff}
 #list li .q{font-size:12px;color:#8b0000;margin-top:4px}
 #msg{text-align:center;padding:15px;color:#dc143c;font-size:14px}
@@ -38,15 +31,6 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sa
 </head>
 <body>
 <div id="bg"></div>
-
-<div id="player">
-<div class="topBar">
-<button id="btnClose">&#10005;</button>
-<span id="nowPlaying">-</span>
-<button id="btnFav">☆</button>
-</div>
-<video id="vid" playsinline webkit-playsinline controls></video>
-</div>
 
 <div id="header">
 <h1>SōF MoJiTo TV</h1>
@@ -66,57 +50,13 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sa
 <button id="moreBtn" class="hidden">MAS STREAMS (+50)</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 var BASE=window.location.protocol+'//'+window.location.host,
 API=BASE+'/api/search',
-streams=[],favorites=[],idx=-1,txt='',page=1,hasMore=false,loading=false,showingFavs=false,
-currentFav=false,currentIdx=-1,
-hls=null,
+streams=[],favorites=[],idx=-1,txt='',page=1,hasMore=false,loading=false;
 list=document.getElementById('list'),msg=document.getElementById('msg'),
 moreBtn=document.getElementById('moreBtn'),
-search=document.getElementById('search'),
-player=document.getElementById('player'),
-vid=document.getElementById('vid'),
-nowP=document.getElementById('nowPlaying'),
-btnFav=document.getElementById('btnFav'),
-videoTimeout=null;
-
-function clearVideoTimeout(){if(videoTimeout){clearTimeout(videoTimeout);videoTimeout=null}}
-function destroyHls(){if(hls){hls.destroy();hls=null}clearVideoTimeout()}
-
-function play(url,title,isFav,i){
-    destroyHls();
-    currentFav=isFav;currentIdx=i;
-    nowP.textContent=title;
-    btnFav.textContent=favorites.some(function(f){return f.url===url})?'★':'☆';
-    player.classList.add('show');
-    if(typeof Hls!=='undefined'&&Hls.isSupported()){
-        hls=new Hls({maxBufferLength:30,maxMaxBufferLength:60});
-        hls.loadSource(url);
-        hls.attachMedia(vid);
-        hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){})});
-        hls.on(Hls.Events.ERROR,function(ev,data){
-            if(data.fatal){destroyHls();vid.pause();log('✗ Falló – prueba otro');player.classList.remove('show')}
-        });
-    }else{
-        vid.src=url;vid.play().catch(function(){});
-    }
-    vid.onerror=function(){destroyHls();log('✗ Falló – prueba otro');player.classList.remove('show')};
-    vid.onplaying=function(){vid.onplaying=null;clearVideoTimeout()};
-    videoTimeout=setTimeout(function(){if(!hls&&vid.readyState<2){log('✗ Timeout');player.classList.remove('show')}},20000);
-}
-
-function closePlayer(){destroyHls();vid.src='';vid.pause();player.classList.remove('show')}
-
-document.getElementById('btnClose').addEventListener('click',closePlayer);
-btnFav.addEventListener('click',function(){
-    var url=currentFav?favorites[currentIdx].url:streams[currentIdx].url;
-    var title=currentFav?favorites[currentIdx].title:streams[currentIdx].title;
-    var exists=favorites.findIndex(function(f){return f.url===url});
-    if(exists>=0){favorites.splice(exists,1);btnFav.textContent='☆'}
-    else{favorites.push({title:title,url:url});btnFav.textContent='★';log('★ Guardado')}
-});
+search=document.getElementById('search');
 
 function log(m){msg.textContent=m}
 
@@ -124,13 +64,26 @@ function ql(t){return /1080|4k|uhd/i.test(t)?'1080p':/720|hd/i.test(t)?'HD':/480
 
 function sortStreams(){streams.sort(function(a,b){var ga=/1080|4k|uhd/i.test(a.title)?3:/720|hd/i.test(a.title)?2:1,gb=/1080|4k|uhd/i.test(b.title)?3:/720|hd/i.test(b.title)?2:1;return gb-ga})}
 
+function play(url){
+    var html='<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>SŌF Player</title><style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}video{width:100%;height:100%;object-fit:contain;background:#000}</style></head><body><video id="v" playsinline webkit-playsinline controls autoplay></video><script>document.getElementById("v").src="'+url+'";<\/script></body></html>';
+    var w=window.open('','_blank');
+    if(w){w.document.write(html);w.document.close();}
+    else{window.location.href=url;}
+}
+
+function addFav(url,title){
+    if(favorites.some(function(f){return f.url===url}))return;
+    favorites.push({title:title,url:url});
+    log('★ Guardado');
+}
+
 function renderList(items,isFav){
     list.innerHTML='';
     items.forEach(function(s,i){
         var li=document.createElement('li');
         var q=ql(s.title);
         li.innerHTML='<div class="t">'+(i+1)+'. '+s.title.substring(0,50)+'</div>'+(q?'<div class="q">'+q+'</div>':'');
-        li.addEventListener('click',function(){play(s.url,s.title,isFav,i)});
+        li.addEventListener('click',function(){play(s.url);addFav(s.url,s.title)});
         list.appendChild(li);
     });
     list.classList.remove('hidden');
@@ -179,12 +132,10 @@ search.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefau
 moreBtn.addEventListener('click',function(){if(hasMore&&!loading){page++;loadPage(page);this.classList.add('hidden')}});
 
 document.getElementById('tabSearch').addEventListener('click',function(){
-    showingFavs=false;
     this.classList.add('active');document.getElementById('tabFav').classList.remove('active');
     if(streams.length)renderList(streams,false);else{msg.classList.remove('hidden');list.classList.add('hidden')}
 });
 document.getElementById('tabFav').addEventListener('click',function(){
-    showingFavs=true;
     this.classList.add('active');document.getElementById('tabSearch').classList.remove('active');
     if(favorites.length)renderList(favorites,true);else{log('Sin favoritos');msg.classList.remove('hidden');list.classList.add('hidden')}
 });
