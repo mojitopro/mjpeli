@@ -2,16 +2,12 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SŌF MOJITO TV</title>
 <style>
 *{margin:0;padding:0}
-html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;overflow:hidden}
-#bg1,#bg2{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;background-repeat:no-repeat;transition:opacity 2s ease-in-out;z-index:0}
-#bg1{opacity:1}
-#bg2{opacity:0}
-#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000;z-index:1}
-#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2}
+html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial}
+#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000}
+#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center}
 .logo{font-size:72px;font-weight:bold;text-align:center;line-height:1}
 .logo .sof{color:#8b0000;text-shadow:0 0 10px #ff0000,0 0 20px #8b0000}
 .logo .mojito{color:#dc143c;text-shadow:0 0 10px #ff0000,0 0 20px #dc143c}
@@ -22,24 +18,18 @@ html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;ov
 .error{color:#ff0000}
 .info{color:#dc143c}
 .hidden{display:none}
-#qm{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;flex-direction:column;justify-content:center;align-items:center}
+#qm{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:200;flex-direction:column;justify-content:center;align-items:center}
 #qm.show{display:flex}
 #qm h2{color:#ff0000;font-size:48px;margin-bottom:40px;text-shadow:0 0 20px #ff0000,0 0 40px #8b0000}
 #qm p{color:#8b0000;font-size:24px;padding:15px}
 select{font-size:20px;width:100%;padding:15px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:8px;margin-top:20px;height:300px}
 option{background:#1a1a1a;color:#aaa;padding:12px}
 option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
-#mobileInput{display:none;width:85%;max-width:400px;font-size:18px;padding:12px 16px;background:#1a1a1a;color:#fff;border:1px solid #555;border-radius:8px;margin:10px 0;outline:none;-webkit-user-select:auto;user-select:auto}
-#mobileInput:focus{border-color:#ff0000}
-#mobileInput.show{display:block}
 </style>
 </head>
 <body>
 
-<div id="bg1"></div>
-<div id="bg2"></div>
-
-<video id="video" playsinline webkit-playsinline controls></video>
+<video id="video" controls></video>
 
 <div id="qm">
 <h2>SŌF CONTROL</h2>
@@ -52,7 +42,6 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <div id="menu">
 <div class="logo"><span class="sof">SōF</span><span class="mojito"> MoJiTo</span><span class="tv"> TV</span></div>
 <div id="in">Escribe el canal...</div>
-<input type="search" id="mobileInput" placeholder="Buscar canal..." autocomplete="off" autocapitalize="none">
 <button id="more" style="display:none;margin-top:10px;padding:10px 20px;background:#8b0000;border:none;color:#fff;cursor:pointer;">MAS STREAMS (+20)</button>
 <div id="msg" class="info">↑↓ navegar | ENTER reproducir</div>
 <select id="results" size="10" class="hidden"></select>
@@ -61,9 +50,8 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <script>
 var BASE=window.location.protocol+'//'+window.location.host;
 var API=BASE+'/api/search';
-var isMobile=(/Mobi|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||'ontouchstart' in window||navigator.maxTouchPoints>0||window.innerWidth<1024);
 var streams=[], favorites=[], idx=0, txt='', mode='search', page=1, hasMore=false, loading=false;
-var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video'), elMobileInput=document.getElementById('mobileInput'), elMore=document.getElementById('more');
+var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video');
 
 function log(m,t){elMsg.textContent=m;elMsg.className=t||'info'}
 
@@ -92,7 +80,6 @@ function addFavorite(){
 function showFavorites(){
     mode='favorites';
     elSel.innerHTML='';elSel.classList.remove('hidden');
-    elMore.style.display='none';
     if(!favorites.length){log('Sin favoritos');return;}
     favorites.forEach(function(f,i){
         elSel.add(new Option('★ '+f.title.substring(0,60),i));
@@ -101,53 +88,44 @@ function showFavorites(){
     log(favorites.length+' favoritos');
 }
 
-function playStream(i){
-    var s=streams[i];
-    if(!s)return;
-    if(isMobile){window.open(s.url,'_blank');return;}
-    log('▶ '+s.title.substring(0,40));
+function playStream(startIdx){
+    var trial=0, max=5, s;
+    function tryNext(){
+        if(trial>=max||!(s=streams[startIdx+trial])){
+            log('Sin stream válido');
+            elVideo.style.display='none';
+            elMenu.style.display='flex';
+            return;
+        }
+        log('Probando '+(trial+1)+': '+s.title.substring(0,25));
+        elVideo.dataset.idx=startIdx+trial;
+        elVideo.src=s.url;
+        elVideo.play().then(function(){log('✓ '+s.title.substring(0,30));}).catch(function(){trial++;setTimeout(tryNext,800);});
+    }
     elVideo.style.display='block';
     elMenu.style.display='none';
-    elVideo.onerror=null;
-    elVideo.dataset.idx=i;
-    elVideo.src=s.url;
-    elVideo.onplaying=function(){elVideo.onplaying=null;log('✓ '+s.title.substring(0,40));};
-    elVideo.onerror=function(){
-        elVideo.onerror=null;
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
-    };
+    elVideo.onerror=function(){trial++;setTimeout(tryNext,500);};
+    tryNext();
 }
 
 function playFav(favIdx){
     var f=favorites[favIdx];
     if(!f)return;
-    if(isMobile){window.open(f.url,'_blank');return;}
-    log('▶ '+f.title.substring(0,40));
-    elVideo.onerror=null;
     elVideo.dataset.idx=favIdx;
     elVideo.src=f.url;
     elVideo.style.display='block';
     elMenu.style.display='none';
     elVideo.onerror=function(){
-        elVideo.onerror=null;
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
+        var n=parseInt(elVideo.dataset.idx)+1;
+        if(n<favorites.length){log('Error, siguiente...');setTimeout(function(){playFav(n)},1500);}else{log('Sin opciones');}
     };
-}
-
-function resetSearchState(){
-    streams=[];page=1;hasMore=false;idx=-1;
-    elSel.innerHTML='';elSel.classList.add('hidden');
-    elMore.style.display='none';
+    elVideo.play().catch(function(){log('Toca para reproducir');});
 }
 
 function buscar(){
     if(!txt.trim())return;
     log('Buscando...');
-    resetSearchState();
+    elSel.innerHTML='';streams=[];page=1;
     loadPage(1);
 }
 
@@ -157,32 +135,34 @@ function loadPage(p){
     log('Cargando...');
     var x=new XMLHttpRequest();
     x.open('GET',API+'?q='+encodeURIComponent(txt)+'&page='+p,true);
-    x.timeout=20000;
     x.onload=function(){
         loading=false;
         if(x.status===200){
             try{
                 var d=JSON.parse(x.responseText);
-                showStreams(d.streams||[],!!d.hasMore,p===1);
-                if(p>1&&d.streams&&d.streams.length){idx=streams.length-d.streams.length;elSel.selectedIndex=idx;elSel.focus();}
-            }catch(e){log('Error al parsear');hasMore=false;}
-        }else{loading=false;log('Error del servidor');hasMore=false;}
+                showStreams(d.streams||[],d.hasMore,p===1);
+                if(p>1){idx=streams.length-d.streams.length;elSel.selectedIndex=idx;elSel.focus();}
+            }catch(e){log('Error');}
+        }
     };
-    x.onerror=function(){loading=false;log('Sin conexion');hasMore=false;};
-    x.ontimeout=function(){loading=false;log('Timeout');hasMore=false;};
+    x.onerror=function(){loading=false;log('Sin conexion');};
     x.send();
 }
 
 function showStreams(data,more,isFirst){
-    if(!data||!data.length){log('Sin resultados');hasMore=more;return;}
+    if(!data||!data.length){log('Sin resultados');return;}
     hasMore=more;
+    data.sort(function(a,b){
+        var ga=/1080|4k|uhd/i.test(a.title)?3:(/720|hd/i.test(a.title)?2:1);
+        var gb=/1080|4k|uhd/i.test(b.title)?3:(/720|hd/i.test(b.title)?2:1);
+        return gb-ga;
+    });
     if(isFirst){streams=data;idx=-1;elSel.innerHTML='';elSel.classList.remove('hidden');}
     data.forEach(function(s,i){
         var pos=isFirst?i:streams.length;
         elSel.add(new Option((pos+1)+'. '+s.title.substring(0,50)+ql(s.title),pos));
         streams.push(s);
     });
-    if(hasMore){elMore.style.display='block';}
     log(streams.length+' streams'+(hasMore?' - MAS':' - FIN'));
 }
 
@@ -213,58 +193,12 @@ document.addEventListener('keydown',function(e){
     else if(k==='F1'){e.preventDefault();document.getElementById('qm').classList.toggle('show');}
     else if(k==='f'||k==='F'){if(mode==='search'&&streams[idx])addFavorite();}
     else if(k==='s'||k==='S'){showFavorites();}
-    else if(k==='Home'){txt='';renderIn();setMode('search');elSel.innerHTML='';idx=-1;hasMore=false;elMore.style.display='none';}
+    else if(k==='Home'){txt='';renderIn();setMode('search');elSel.innerHTML='';idx=-1;}
     else if(k==='PageDown'){if(hasMore){page++;loadPage(page);}}
     else if(k==='PageUp'){if(page>1){page--;loadPage(page);}}
 });
 
-elMore.addEventListener('click',function(){
-    if(hasMore&&!loading){page++;loadPage(page);elMore.style.display='none';}
-});
-
-if('ontouchstart' in window||navigator.maxTouchPoints){
-    elMobileInput.classList.add('show');
-    elMobileInput.addEventListener('input',function(){
-        txt=elMobileInput.value.toLowerCase();
-        renderIn();
-        idx=-1;elSel.innerHTML='';
-    });
-    elMobileInput.addEventListener('keydown',function(e){
-        if(e.key==='Enter'){e.preventDefault();buscar();elMobileInput.blur();}
-    });
-    elSel.addEventListener('change',function(){
-        var i=parseInt(elSel.value);
-        idx=i;
-        if(mode==='favorites'&&favorites[i])playFav(i);
-        else if(mode==='search'&&streams[i])playStream(i);
-    });
-}
-
-var bgs=[
-'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUydjQyOXRoYjM2a3JydGZ0Zm42azZydnI3ZnJ1ZHFrZXJ5aW9iOHFiMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/riw3K0D2h4klG/giphy.gif',
-'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyNGJwdW00b2RrcnIyenY3Ymh3ZGZ3Y3h0Y2IyeWdvdGxob3BmeW9hYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QuPrp3BI6cMe2lErCb/giphy.gif',
-'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyMXd3enBqODk2dHVnZmY2MGFuNmJpYW5tZXAzam4zaWx5bjl1dDRnMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VLzbEtlbwJUFljcRbf/giphy.gif',
-'https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUyaWFzbzRuZnI4bmFwcWN5Z2kyZXViNnNsang1cWx5NDlydDgwamp6bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/DoiNV6NO73U5DVq1vA/giphy.gif',
-'https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUydzB6bGVjZnhidXhhdTk3emhndjc0MzNpanBrZ3NpOHp2cDNhbTVnMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1oSbCb9ZhC7MvQBd3s/giphy.gif',
-'https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjJ5dWI4NW95bHk1NXRyZWkwaTMwdGdkOWU3dW1qYjkwc3N4ZmlucCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TIEh1VS5EYQt5QbODH/giphy.gif',
-'https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyd202emhrcjM5NHN6czNjYWk2MGh3bTFyb3RnOXJjOGFnYmNvZXNycCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/J1KaQ7nz8P0L3O15L7/giphy.gif',
-'https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyYnhsZWEyejh2cHM3bzhubnkzNXEzbnNzbDhsMm4xZjVpZTlnZWM1OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/muzaYMXAENjiw/giphy.gif'
-];
-for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bgs[i];bgs[i]=bgs[j];bgs[j]=t;}
-var elBg1=document.getElementById('bg1'),elBg2=document.getElementById('bg2'),activeBg='bg1',bgIdx=0;
-function nextBg(){
-    if(bgIdx>=bgs.length){for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bgs[i];bgs[i]=bgs[j];bgs[j]=t;}bgIdx=0;}
-    return bgs[bgIdx++];
-}
-elBg1.style.backgroundImage='url('+nextBg()+')';
-setInterval(function(){
-var incoming=nextBg();
-if(activeBg==='bg1'){elBg2.style.backgroundImage='url('+incoming+')';elBg2.style.opacity='1';elBg1.style.opacity='0';activeBg='bg2';}
-else{elBg1.style.backgroundImage='url('+incoming+')';elBg1.style.opacity='1';elBg2.style.opacity='0';activeBg='bg1';}
-},5000);
-
 renderIn();
-if(isMobile){log('isMobile=TRUE | '+navigator.userAgent.substring(0,30));}
 </script>
 </body>
 </html>
