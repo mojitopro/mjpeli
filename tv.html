@@ -108,12 +108,12 @@ function playStream(i){
     elMenu.style.display='none';
     elVideo.dataset.idx=i;
     elVideo.src=s.url;
+    var loaded=false;
+    elVideo.onloadeddata=function(){loaded=true;elVideo.onloadeddata=null;};
     elVideo.onplaying=function(){elVideo.onplaying=null;log('✓ '+s.title.substring(0,40));};
     elVideo.onerror=function(){
-        elVideo.onerror=null;
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
+        if(loaded){elVideo.onerror=null;log('✗ Falló – elige otro manualmente');elVideo.style.display='none';elMenu.style.display='flex';}
+        else{elVideo.onerror=null;}
     };
     elVideo.play().catch(function(){});
 }
@@ -126,11 +126,11 @@ function playFav(favIdx){
     elVideo.src=f.url;
     elVideo.style.display='block';
     elMenu.style.display='none';
+    var loaded=false;
+    elVideo.onloadeddata=function(){loaded=true;elVideo.onloadeddata=null;};
     elVideo.onerror=function(){
-        elVideo.onerror=null;
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
+        if(loaded){elVideo.onerror=null;log('✗ Falló – elige otro manualmente');elVideo.style.display='none';elMenu.style.display='flex';}
+        else{elVideo.onerror=null;}
     };
     elVideo.play().catch(function(){});
 }
