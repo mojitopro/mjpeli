@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response, redirect
 import os
 import re
 import urllib.parse
@@ -27,6 +27,24 @@ def index():
     if MOBILE_RE.search(ua) or w == 'm':
         return send_file(os.path.join(os.path.dirname(__file__), 'mobile.html'))
     return send_file(os.path.join(os.path.dirname(__file__), 'tv.html'))
+
+@app.route('/stream')
+def api_stream():
+    url = request.args.get('url', '')
+    if not url:
+        return 'Missing URL', 400
+    try:
+        r = session.get(url, stream=True, timeout=30,
+                        headers={'Referer': 'https://searchtv.net/'})
+        if r.status_code != 200:
+            return 'Stream error', r.status_code
+        def gen():
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        return Response(gen(), mimetype=r.headers.get('Content-Type', 'application/vnd.apple.mpegurl'))
+    except Exception:
+        return 'Stream error', 500
 
 @app.route('/api/search')
 def api_search():
