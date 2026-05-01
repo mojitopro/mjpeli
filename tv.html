@@ -100,55 +100,47 @@ function showFavorites(){
     log(favorites.length+' favoritos');
 }
 
-function playStream(startIdx){
-    var trial=0, maxTries=5, s, locked=false;
-    function tryNext(){
-        if(locked)return;
-        locked=true;
-        if(trial>=maxTries||!(s=streams[startIdx+trial])){
-            log('Sin stream válido');
-            elVideo.style.display='none';
-            elMenu.style.display='flex';
-            locked=false;
-            return;
-        }
-        log('Probando '+(trial+1)+': '+s.title.substring(0,25));
-        elVideo.dataset.idx=startIdx+trial;
-        elVideo.src=s.url;
-        elVideo.onplaying=function(){
-            elVideo.onplaying=null;
-            locked=false;
-            log('✓ '+s.title.substring(0,30));
-        };
-        elVideo.onerror=function(){
-            elVideo.onerror=null;
-            if(locked){locked=false;trial++;setTimeout(tryNext,500);}
-        };
-        elVideo.play().then(function(){
-            locked=false;
-            log('✓ '+s.title.substring(0,30));
-        }).catch(function(){
-            if(locked){locked=false;trial++;setTimeout(tryNext,800);}
-        });
-    }
+function playStream(i){
+    var s=streams[i];
+    if(!s)return;
+    log('▶ '+s.title.substring(0,40));
     elVideo.style.display='block';
     elMenu.style.display='none';
-    trial=0;
-    tryNext();
+    elVideo.dataset.idx=i;
+    elVideo.src=s.url;
+    elVideo.onplaying=function(){elVideo.onplaying=null;log('✓ '+s.title.substring(0,40));};
+    elVideo.onerror=function(){
+        elVideo.onerror=null;
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
+    };
+    elVideo.play().catch(function(){
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
+    });
 }
 
 function playFav(favIdx){
     var f=favorites[favIdx];
     if(!f)return;
+    log('▶ '+f.title.substring(0,40));
     elVideo.dataset.idx=favIdx;
     elVideo.src=f.url;
     elVideo.style.display='block';
     elMenu.style.display='none';
     elVideo.onerror=function(){
-        var n=parseInt(elVideo.dataset.idx)+1;
-        if(n<favorites.length){log('Error, siguiente...');setTimeout(function(){playFav(n)},1500);}else{log('Sin opciones');}
+        elVideo.onerror=null;
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
     };
-    elVideo.play().catch(function(){log('Toca para reproducir');});
+    elVideo.play().catch(function(){
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
+    });
 }
 
 function resetSearchState(){
@@ -242,8 +234,6 @@ if('ontouchstart' in window||navigator.maxTouchPoints){
 renderIn();
 
 var bgs=[
-'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyZ3JjbTJnZjZuOWNiOWV5eGF2cjNjcW5oc28zeHBwaXB1d2RsM25uaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/UyYcK4GZKyBHA44JXW/giphy.gif',
-'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUydmhldXRzNndrcnZsZGVidHlsNmtobXhpNXhqMGl0bWhyZ2FwaW93ZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/45aI8f1nI1b071X96C/giphy.gif',
 'https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUycmx2bTBtOWdybGoybWJ3Nmw3ZTRqZjV6azJhM3Fkb25xMHY2ZDV5byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1U9pq0QDGiEEmTzG3D/giphy.gif',
 'https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjR2djg3YWtyY3dvaGR2bWp5bHVhbDlyaWwzbWV6eWswczZwYW9xbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vRjILNceM6FEPHW/giphy.gif'
 ];
