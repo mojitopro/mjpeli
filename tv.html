@@ -115,6 +115,7 @@ function playStream(i){
         elVideo.style.display='none';
         elMenu.style.display='flex';
     };
+    elVideo.play().catch(function(){});
 }
 
 function playFav(favIdx){
@@ -131,6 +132,7 @@ function playFav(favIdx){
         elVideo.style.display='none';
         elMenu.style.display='flex';
     };
+    elVideo.play().catch(function(){});
 }
 
 function resetSearchState(){
