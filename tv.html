@@ -100,10 +100,12 @@ function showFavorites(){
     log(favorites.length+' favoritos');
 }
 
+var isMobile=('ontouchstart' in window||navigator.maxTouchPoints);
 function playStream(i){
     var s=streams[i];
     if(!s)return;
     log('▶ '+s.title.substring(0,40));
+    if(isMobile){window.open(s.url,'_blank');return;}
     elVideo.style.display='block';
     elMenu.style.display='none';
     elVideo.dataset.idx=i;
@@ -121,6 +123,7 @@ function playFav(favIdx){
     var f=favorites[favIdx];
     if(!f)return;
     log('▶ '+f.title.substring(0,40));
+    if(isMobile){window.open(f.url,'_blank');return;}
     elVideo.dataset.idx=favIdx;
     elVideo.src=f.url;
     elVideo.style.display='block';
