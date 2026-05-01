@@ -5,9 +5,12 @@
 <title>SŌF MOJITO TV</title>
 <style>
 *{margin:0;padding:0}
-html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial}
-#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000}
-#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center}
+html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial;overflow:hidden}
+#bg1,#bg2{position:fixed;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;background-repeat:no-repeat;transition:opacity 2s ease-in-out;z-index:0}
+#bg1{opacity:1}
+#bg2{opacity:0}
+#video{width:100%;height:100%;position:fixed;top:0;left:0;display:none;background:#000;z-index:1}
+#menu{padding:50px 10px 0 10px;height:100%;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2}
 .logo{font-size:72px;font-weight:bold;text-align:center;line-height:1}
 .logo .sof{color:#8b0000;text-shadow:0 0 10px #ff0000,0 0 20px #8b0000}
 .logo .mojito{color:#dc143c;text-shadow:0 0 10px #ff0000,0 0 20px #dc143c}
@@ -28,6 +31,9 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 </style>
 </head>
 <body>
+
+<div id="bg1"></div>
+<div id="bg2"></div>
 
 <video id="video" controls></video>
 
@@ -88,38 +94,39 @@ function showFavorites(){
     log(favorites.length+' favoritos');
 }
 
-function playStream(startIdx){
-    var trial=0, max=5, s;
-    function tryNext(){
-        if(trial>=max||!(s=streams[startIdx+trial])){
-            log('Sin stream válido');
-            elVideo.style.display='none';
-            elMenu.style.display='flex';
-            return;
-        }
-        log('Probando '+(trial+1)+': '+s.title.substring(0,25));
-        elVideo.dataset.idx=startIdx+trial;
-        elVideo.src=s.url;
-        elVideo.play().then(function(){log('✓ '+s.title.substring(0,30));}).catch(function(){trial++;setTimeout(tryNext,800);});
-    }
+function playStream(i){
+    var s=streams[i];
+    if(!s)return;
+    log('▶ '+s.title.substring(0,40));
     elVideo.style.display='block';
     elMenu.style.display='none';
-    elVideo.onerror=function(){trial++;setTimeout(tryNext,500);};
-    tryNext();
+    elVideo.dataset.idx=i;
+    elVideo.src=s.url;
+    elVideo.onplaying=function(){elVideo.onplaying=null;log('✓ '+s.title.substring(0,40));};
+    elVideo.onerror=function(){
+        elVideo.onerror=null;
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
+    };
+    elVideo.play().catch(function(){});
 }
 
 function playFav(favIdx){
     var f=favorites[favIdx];
     if(!f)return;
+    log('▶ '+f.title.substring(0,40));
     elVideo.dataset.idx=favIdx;
     elVideo.src=f.url;
     elVideo.style.display='block';
     elMenu.style.display='none';
     elVideo.onerror=function(){
-        var n=parseInt(elVideo.dataset.idx)+1;
-        if(n<favorites.length){log('Error, siguiente...');setTimeout(function(){playFav(n)},1500);}else{log('Sin opciones');}
+        elVideo.onerror=null;
+        log('✗ Falló – elige otro manualmente');
+        elVideo.style.display='none';
+        elMenu.style.display='flex';
     };
-    elVideo.play().catch(function(){log('Toca para reproducir');});
+    elVideo.play().catch(function(){});
 }
 
 function buscar(){
@@ -199,6 +206,29 @@ document.addEventListener('keydown',function(e){
 });
 
 renderIn();
+
+var bgs=[
+'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUydjQyOXRoYjM2a3JydGZ0Zm42azZydnI3ZnJ1ZHFrZXJ5aW9iOHFiMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/riw3K0D2h4klG/giphy.gif',
+'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyNGJwdW00b2RrcnIyenY3Ymh3ZGZ3Y3h0Y2IyeWdvdGxob3BmeW9hYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QuPrp3BI6cMe2lErCb/giphy.gif',
+'https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyMXd3enBqODk2dHVnZmY2MGFuNmJpYW5tZXAzam4zaWx5bjl1dDRnMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VLzbEtlbwJUFljcRbf/giphy.gif',
+'https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUyaWFzbzRuZnI4bmFwcWN5Z2kyZXViNnNsang1cWx5NDlydDgwamp6bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/DoiNV6NO73U5DVq1vA/giphy.gif',
+'https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUydzB6bGVjZnhidXhhdTk3emhndjc0MzNpanBrZ3NpOHp2cDNhbTVnMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1oSbCb9ZhC7MvQBd3s/giphy.gif',
+'https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyMjJ5dWI4NW95bHk1NXRyZWkwaTMwdGdkOWU3dW1qYjkwc3N4ZmlucCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TIEh1VS5EYQt5QbODH/giphy.gif',
+'https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUyd202emhrcjM5NHN6czNjYWk2MGh3bTFyb3RnOXJjOGFnYmNvZXNycCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/J1KaQ7nz8P0L3O15L7/giphy.gif',
+'https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUyYnhsZWEyejh2cHM3bzhubnkzNXEzbnNzbDhsMm4xZjVpZTlnZWM1OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/muzaYMXAENjiw/giphy.gif'
+];
+for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bgs[i];bgs[i]=bgs[j];bgs[j]=t;}
+var elBg1=document.getElementById('bg1'),elBg2=document.getElementById('bg2'),activeBg='bg1',bgIdx=0;
+function nextBg(){
+    if(bgIdx>=bgs.length){for(var i=bgs.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bgs[i];bgs[i]=bgs[j];bgs[j]=t;}bgIdx=0;}
+    return bgs[bgIdx++];
+}
+elBg1.style.backgroundImage='url('+nextBg()+')';
+setInterval(function(){
+var incoming=nextBg();
+if(activeBg==='bg1'){elBg2.style.backgroundImage='url('+incoming+')';elBg2.style.opacity='1';elBg1.style.opacity='0';activeBg='bg2';}
+else{elBg1.style.backgroundImage='url('+incoming+')';elBg1.style.opacity='1';elBg2.style.opacity='0';activeBg='bg1';}
+},5000);
 </script>
 </body>
 </html>
