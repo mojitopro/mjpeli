@@ -61,7 +61,7 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <script>
 var BASE=window.location.protocol+'//'+window.location.host;
 var API=BASE+'/api/search';
-var isMobile=('ontouchstart' in window||navigator.maxTouchPoints>0||/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<768);
+var isMobile=(/Mobi|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||'ontouchstart' in window||navigator.maxTouchPoints>0||window.innerWidth<1024);
 var streams=[], favorites=[], idx=0, txt='', mode='search', page=1, hasMore=false, loading=false;
 var elIn=document.getElementById('in'), elSel=document.getElementById('results'), elMsg=document.getElementById('msg'), elMenu=document.getElementById('menu'), elVideo=document.getElementById('video'), elMobileInput=document.getElementById('mobileInput'), elMore=document.getElementById('more');
 
@@ -264,6 +264,7 @@ else{elBg1.style.backgroundImage='url('+incoming+')';elBg1.style.opacity='1';elB
 },5000);
 
 renderIn();
+if(isMobile){log('isMobile=TRUE | '+navigator.userAgent.substring(0,30));}
 </script>
 </body>
 </html>
