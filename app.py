@@ -26,7 +26,12 @@ def index():
 @app.route('/api/search')
 def api_search():
     q = request.args.get('q', '').strip().lower()
-    page = int(request.args.get('page', 1))
+    try:
+        page = int(request.args.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+    if page < 1:
+        page = 1
 
     if not q:
         return jsonify({'streams': []})
@@ -63,7 +68,7 @@ def api_search():
             try:
                 stream_resp = session.get(
                     f'https://searchtv.net/stream/uuid/{items[i]}/',
-                    timeout=5
+                    timeout=10
                 )
                 if stream_resp.status_code != 200:
                     i += 1
