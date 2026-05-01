@@ -34,31 +34,17 @@ def api_player():
     if not url:
         return 'Missing URL', 400
     safe_url = url.replace('"', '\\"').replace("'", "\\'")
+    proxy_url = '/stream?url=' + urllib.parse.quote(url, safe='')
     return '''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>SŌF MOJITO TV</title>
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;background:#000}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
 <video id="v" playsinline webkit-playsinline controls></video>
 <button id="back" onclick="history.back()">← Volver</button>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>
-var u="''' + safe_url + '''",v=document.getElementById("v");
-function tryPlay(src){v.src=src;v.play().catch(function(){})}
-if(typeof Hls!=="undefined"&&Hls.isSupported()){
-    var h=new Hls({maxBufferLength:60});
-    h.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
-    h.on(Hls.Events.ERROR,function(e,d){
-        if(d.fatal){
-            h.destroy();
-            var p="/stream?url="+encodeURIComponent(u);
-            var h2=new Hls({maxBufferLength:60});
-            h2.loadSource(p);h2.attachMedia(v);
-            h2.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
-            h2.on(Hls.Events.ERROR,function(e2,d2){if(d2.fatal){h2.destroy();tryPlay(u)}});
-        }
-    });
-    h.loadSource(u);h.attachMedia(v);
-}else if(v.canPlayType("application/vnd.apple.mpegurl")){tryPlay(u)}
-else{tryPlay("/stream?url="+encodeURIComponent(u))}
+<script>
+var v=document.getElementById("v");
+v.src="''' + proxy_url + '''";
+v.play().catch(function(){});
 </script></body></html>'''
 
 @app.route('/stream')
@@ -88,7 +74,9 @@ def api_stream():
             resp = Response('\n'.join(body) + '\n', mimetype='application/vnd.apple.mpegurl')
             resp.headers['Access-Control-Allow-Origin'] = '*'
             return resp
-        resp = Response(_stream_gen(r), mimetype=ct)
+        # For direct TS streams, use video/mp2t so browsers can play them
+        mime = 'video/mp2t' if 'octet-stream' in ct or 'mp2t' in ct or 'mpeg' in ct else ct
+        resp = Response(_stream_gen(r), mimetype=mime)
         resp.headers['Access-Control-Allow-Origin'] = '*'
         return resp
     except Exception:

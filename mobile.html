@@ -89,18 +89,7 @@ function play(url,title){
     ovFav.textContent=favorites.some(function(f){return f.url===url})?'★':'☆';
     overlay.classList.add('show');
     var p=BASE+'/stream?url='+encodeURIComponent(url);
-    if(typeof Hls!=='undefined'&&Hls.isSupported()){
-        hls=new Hls({maxBufferLength:60});
-        hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){})});
-        hls.on(Hls.Events.ERROR,function(e,d){
-            if(d.fatal){hls.destroy();hls=null;closeP()}
-        });
-        hls.loadSource(p);hls.attachMedia(vid);
-    }else if(vid.canPlayType('application/vnd.apple.mpegurl')){
-        vid.src=url;vid.play().catch(function(){});
-    }else{
-        vid.src=p;vid.play().catch(function(){});
-    }
+    vid.src=p;vid.play().catch(function(){});
 }
 
 function closeP(){destroyHls();vid.src='';vid.pause();overlay.classList.remove('show')}
