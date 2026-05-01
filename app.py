@@ -40,13 +40,25 @@ def api_player():
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;background:#000}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
 <video id="v" playsinline webkit-playsinline controls></video>
 <button id="back" onclick="history.back()">← Volver</button>
-<script>
-var u="''' + safe_url + '''";
-var v=document.getElementById("v");
-v.src=u;
-v.addEventListener("loadeddata",function(){v.play()});
-v.addEventListener("loadedmetadata",function(){v.play()});
-v.play().catch(function(){});
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>
+var u="''' + safe_url + '''",v=document.getElementById("v");
+function tryPlay(src){v.src=src;v.play().catch(function(){})}
+if(typeof Hls!=="undefined"&&Hls.isSupported()){
+    var h=new Hls({maxBufferLength:60});
+    h.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
+    h.on(Hls.Events.ERROR,function(e,d){
+        if(d.fatal){
+            h.destroy();
+            var p="/stream?url="+encodeURIComponent(u);
+            var h2=new Hls({maxBufferLength:60});
+            h2.loadSource(p);h2.attachMedia(v);
+            h2.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
+            h2.on(Hls.Events.ERROR,function(e2,d2){if(d2.fatal){h2.destroy();tryPlay(u)}});
+        }
+    });
+    h.loadSource(u);h.attachMedia(v);
+}else if(v.canPlayType("application/vnd.apple.mpegurl")){tryPlay(u)}
+else{tryPlay("/stream?url="+encodeURIComponent(u))}
 </script></body></html>'''
 
 @app.route('/stream')
@@ -55,28 +67,37 @@ def api_stream():
     if not url:
         return 'Missing URL', 400
     try:
-        r = session.get(url, timeout=30, headers={'Referer': 'https://searchtv.net/'})
+        r = session.get(url, stream=True, timeout=30, headers={
+            'Referer': 'https://searchtv.net/',
+            'User-Agent': HEADERS['User-Agent']
+        })
         if r.status_code != 200:
             return 'Stream error', r.status_code
         ct = r.headers.get('Content-Type', '')
-        if 'mpegurl' in ct or 'm3u8' in ct or 'x-mpegurl' in ct:
+        if 'mpegurl' in ct or 'm3u8' in ct or 'x-mpegurl' in ct or url.endswith('.m3u8'):
             base = url.rsplit('/', 1)[0] + '/'
-            def rewrite(line):
+            body = []
+            for line in r.iter_lines(decode_unicode=True):
                 line = line.strip()
                 if not line or line.startswith('#'):
-                    return line
-                if line.startswith('http'):
-                    return '/stream?url=' + urllib.parse.quote(line, safe='')
-                return '/stream?url=' + urllib.parse.quote(base + line, safe='')
-            body = '\n'.join(rewrite(l) for l in r.text.splitlines())
-            return Response(body, mimetype='application/vnd.apple.mpegurl')
-        def gen():
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-        return Response(gen(), mimetype=ct)
+                    body.append(line)
+                elif line.startswith('http'):
+                    body.append('/stream?url=' + urllib.parse.quote(line, safe=''))
+                else:
+                    body.append('/stream?url=' + urllib.parse.quote(base + line, safe=''))
+            resp = Response('\n'.join(body) + '\n', mimetype='application/vnd.apple.mpegurl')
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            return resp
+        resp = Response(_stream_gen(r), mimetype=ct)
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp
     except Exception:
         return 'Stream error', 500
+
+def _stream_gen(r):
+    for chunk in r.iter_content(chunk_size=8192):
+        if chunk:
+            yield chunk
 
 @app.route('/api/search')
 def api_search():
