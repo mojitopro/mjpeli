@@ -58,7 +58,6 @@ option:checked,option:focus,option:selected{background:#0066cc;color:#fff}
 <select id="results" size="10" class="hidden"></select>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 var BASE=window.location.protocol+'//'+window.location.host;
 var API=BASE+'/api/search';
@@ -105,7 +104,7 @@ function showFavorites(){
 function playStream(i){
     var s=streams[i];
     if(!s)return;
-    if(isMobile){log('▶ '+s.title.substring(0,40));openMobilePlayer(s.url);return;}
+    if(isMobile){log('▶ '+s.title.substring(0,40));window.location.href=s.url;return;}
     log('▶ '+s.title.substring(0,40));
     elVideo.style.display='block';
     elMenu.style.display='none';
@@ -124,7 +123,7 @@ function playStream(i){
 function playFav(favIdx){
     var f=favorites[favIdx];
     if(!f)return;
-    if(isMobile){log('▶ '+f.title.substring(0,40));openMobilePlayer(f.url);return;}
+    if(isMobile){log('▶ '+f.title.substring(0,40));window.location.href=f.url;return;}
     log('▶ '+f.title.substring(0,40));
     elVideo.onerror=null;
     elVideo.dataset.idx=favIdx;
@@ -136,39 +135,6 @@ function playFav(favIdx){
         log('✗ Falló – elige otro manualmente');
         elVideo.style.display='none';
         elMenu.style.display='flex';
-    };
-}
-
-var mobileOverlay=null,mobilePlayer=null,mobileHls=null;
-function openMobilePlayer(url){
-    if(mobileOverlay){mobileOverlay.remove();mobileOverlay=null;}
-    if(mobilePlayer){mobilePlayer.remove();mobilePlayer=null;}
-    if(mobileHls){mobileHls.destroy();mobileHls=null;}
-    mobileOverlay=document.createElement('div');
-    mobileOverlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:999;display:flex;align-items:center;justify-content:center;';
-    mobilePlayer=document.createElement('video');
-    mobilePlayer.setAttribute('playsinline','');mobilePlayer.setAttribute('webkit-playsinline','');mobilePlayer.setAttribute('controls','');mobilePlayer.setAttribute('style','width:100%;height:100%;background:#000;');
-    mobileOverlay.appendChild(mobilePlayer);
-    document.body.appendChild(mobileOverlay);
-    if(typeof Hls!=='undefined'&&Hls.isSupported()&&url.indexOf('.m3u8')!==-1){
-        mobileHls=new Hls();
-        mobileHls.loadSource(url);
-        mobileHls.attachMedia(mobilePlayer);
-        mobileHls.on(Hls.Events.MANIFEST_PARSED,function(){mobilePlayer.play().catch(function(){});});
-    }else{
-        mobilePlayer.src=url;
-        mobilePlayer.play().catch(function(){});
-    }
-    var closeBtn=document.createElement('div');
-    closeBtn.innerHTML='&#10005;';closeBtn.style.cssText='position:fixed;top:20px;right:20px;z-index:1000;color:#fff;font-size:32px;background:rgba(139,0,0,0.8);width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-    closeBtn.onclick=function(){if(mobileHls){mobileHls.destroy();mobileHls=null;}mobilePlayer.pause();mobilePlayer.src='';mobilePlayer=null;mobileOverlay.remove();mobileOverlay=null;closeBtn.remove();elMenu.style.display='flex';};
-    document.body.appendChild(closeBtn);
-    mobilePlayer.onended=function(){closeBtn.onclick();};
-    mobilePlayer.onerror=function(){
-        if(mobileHls&&mobileHls.levels.length===0){return;}
-        mobilePlayer.onerror=null;
-        log('✗ Falló – elige otro manualmente');
-        closeBtn.onclick();
     };
 }
 
