@@ -116,9 +116,7 @@ function playStream(i){
         elMenu.style.display='flex';
     };
     elVideo.play().catch(function(){
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
+        log('Toca ▶ para reproducir');
     });
 }
 
@@ -137,9 +135,7 @@ function playFav(favIdx){
         elMenu.style.display='flex';
     };
     elVideo.play().catch(function(){
-        log('✗ Falló – elige otro manualmente');
-        elVideo.style.display='none';
-        elMenu.style.display='flex';
+        log('Toca ▶ para reproducir');
     });
 }
 
