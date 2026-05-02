@@ -143,48 +143,24 @@ def api_stream():
     if 'player.how' in url:
         try:
             import cloudscraper
-            from playwright.sync_api import sync_playwright
             import re as regex
 
-            # Use cloudscraper to get Cloudflare cookies
+            # Use cloudscraper to bypass Cloudflare
             scraper = cloudscraper.create_scraper()
-            scraper.get('https://player.how/', timeout=30)
+            resp = scraper.get(url, timeout=30)
 
-            # Use playwright with cloudscraper cookies to render JavaScript
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                context = browser.new_context(
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                )
+            if resp.status_code == 200:
+                # Look for m3u8/mp4 URLs in the page
+                links = regex.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', resp.text)
+                if links:
+                    stream_url = links[0]
+                    return redirect(f'/stream?url={urllib.parse.quote(stream_url, safe="")}')
 
-                # Add cloudscraper cookies to playwright
-                for cookie in scraper.cookies:
-                    context.add_cookies([{
-                        'name': cookie.name,
-                        'value': cookie.value,
-                        'domain': cookie.domain,
-                        'path': cookie.path,
-                    }])
-
-                page = context.new_page()
-                page.goto(url, wait_until='networkidle', timeout=30000)
-
-                # Get the iframe src (which should be the stream URL)
-                iframe_src = page.get_attribute('iframe#player', 'src')
-                if not iframe_src:
-                    iframe_src = page.evaluate('''() => {
-                        const iframe = document.getElementById("player");
-                        return iframe ? iframe.src : null;
-                    }''')
-
-                browser.close()
-
-                if iframe_src and iframe_src.startswith('http'):
-                    # Check if it's an m3u8/mp4 URL
-                    if '.m3u8' in iframe_src or '.mp4' in iframe_src:
-                        return redirect(f'/stream?url={urllib.parse.quote(iframe_src, safe="")}')
-                    else:
-                        # It's another page, fetch it
+                # Check for iframe src
+                iframe_match = regex.search(r'<iframe[^>]+src="([^"]+)"', resp.text)
+                if iframe_match:
+                    iframe_src = iframe_match.group(1)
+                    if iframe_src.startswith('http'):
                         return redirect(f'/stream?url={urllib.parse.quote(iframe_src, safe="")}')
 
             return 'Unable to extract stream from player.how', 502
