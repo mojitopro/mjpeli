@@ -66,15 +66,17 @@ def _start_hls(url, sid):
 
 @app.route('/')
 def index():
-    # Get recent movies and series using search API
+    # Get recent movies and series using cloudscraper to bypass Cloudflare
     try:
+        import cloudscraper
         import re as regex
 
-        # Search for recent content (2026 releases)
-        resp = session.get('https://cineflix.is/search/?query=2026', timeout=60)
+        # Use cloudscraper to bypass Cloudflare
+        scraper = cloudscraper.create_scraper()
+        resp = scraper.get('https://cineflix.is/search/?query=2026', timeout=60)
 
         if resp.status_code != 200:
-            return 'Error loading content', 500
+            return f'Error loading content: {resp.status_code}', 500
 
         try:
             data = resp.json()
@@ -92,7 +94,6 @@ def index():
 body { font-family: Arial, sans-serif; background: #000; color: #fff; }
 .container { max-width: 1200px; margin:0 auto; padding: 20px; }
 h1 { color: #b78a62; margin-bottom: 20px; }
-h2 { color: #fff; margin: 20px 0 10px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
 .card { background: #111; border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
 .card:hover { transform: scale(1.05); }
@@ -253,7 +254,11 @@ def api_search():
     start_idx = (page - 1) * limit
 
     try:
-        resp = session.get(
+        # Use cloudscraper to bypass Cloudflare
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
+        
+        resp = scraper.get(
             f'https://cineflix.is/search/?query={urllib.parse.quote(q)}',
             timeout=60
         )
@@ -282,8 +287,8 @@ def api_search():
                 item_id = items[i]
                 title = data[item_id].get('title', item_id)
 
-                # Extract stream URL from movie/series page at movies.cineflix.is
-                page_resp = session.get(
+                # Extract stream URL using cloudscraper
+                page_resp = scraper.get(
                     f'https://movies.cineflix.is/watch/{item_id}/',
                     timeout=30
                 )
@@ -292,13 +297,12 @@ def api_search():
                 if page_resp.status_code == 200:
                     html = page_resp.text
 
-                    # Extract player.how URL from iframe data-src
+                    # Extract player.how URL from iframe
                     import re as regex
                     player_match = regex.search(r'data-src="(https?://player\.how[^"]+)"', html)
                     if player_match:
                         url = player_match.group(1)
                     
-                    # If not found, try src attribute
                     if not url:
                         player_match = regex.search(r'<iframe[^>]+src="(https?://player\.how[^"]+)"', html)
                         if player_match:
@@ -310,7 +314,7 @@ def api_search():
                 else:
                     i += 1
                     continue
-            except requests.exceptions.RequestException:
+            except Exception:
                 pass
             i += 1
 
