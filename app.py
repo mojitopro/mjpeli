@@ -20,7 +20,7 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://cineflix.is/',
+    'Referer': 'https://searchtv.net/',
 }
 
 session = requests.Session()
@@ -107,7 +107,7 @@ def api_stream():
     if 'mpegurl' in ct or 'm3u8' in ct or 'x-mpegurl' in ct or url.endswith('.m3u8'):
         try:
             r = session.get(url, stream=True, timeout=30, headers={
-                'Referer': 'https://cineflix.is/',
+                'Referer': 'https://searchtv.net/',
                 'User-Agent': HEADERS['User-Agent']
             })
             if r.status_code != 200:
@@ -189,7 +189,7 @@ def api_search():
 
     try:
         resp = session.get(
-            f'https://cineflix.is/search/?query={urllib.parse.quote(q)}',
+            f'https://searchtv.net/search/?query={urllib.parse.quote(q)}',
             timeout=60
         )
 
@@ -215,7 +215,7 @@ def api_search():
         while downloaded < limit and i < len(items):
             try:
                 stream_resp = session.get(
-                    f'https://cineflix.is/stream/uuid/{items[i]}/',
+                    f'https://searchtv.net/stream/uuid/{items[i]}/',
                     timeout=30
                 )
                 if stream_resp.status_code != 200:
