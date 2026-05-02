@@ -81,7 +81,7 @@ def api_player():
     proxy_url = '/stream?url=' + urllib.parse.quote(url, safe='')
     return '''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>SŌF MOJITO TV</title>
+<title>CineFlix</title>
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;background:#000}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
 <video id="v" playsinline webkit-playsinline controls></video>
 <button id="back" onclick="history.back()">← Volver</button>
@@ -216,68 +216,36 @@ def api_search():
             try:
                 item_id = items[i]
                 title = data[item_id].get('title', item_id)
-                
-                # Try stream endpoint first (for TV-like content)
-                stream_resp = session.get(
-                    f'https://cineflix.is/stream/uuid/{item_id}/',
-                    timeout=30,
-                    allow_redirects=True
+
+                # Extract stream URL from movie/series page
+                page_resp = session.get(
+                    f'https://cineflix.is/{item_id}/',
+                    timeout=30
                 )
-                
+
                 url = ''
-                if stream_resp.status_code == 200 and '#EXTM3U' in stream_resp.text:
-                    # Extract M3U8 URL from stream response
-                    for line in stream_resp.text.splitlines():
-                        if M3U_URL_RE.match(line.strip()):
-                            url = line.strip()
-                            break
-                
-                # If stream endpoint fails, try movie page
-                if not url:
-                    page_resp = session.get(
-                        f'https://cineflix.is/{item_id}/',
-                        timeout=30
-                    )
-                    if page_resp.status_code == 200:
-                        # Extract m3u8/mp4 links from page HTML
-                        import re as regex
-                        # Find all m3u8/mp4 URLs in the page
-                        links = regex.findall(r'https?://[^\s"\'<>]+\.(m3u8|mp4)[^\s"\'<>]*', page_resp.text)
-                        if links:
-                            url = links[0]
-                        # Also check for src attributes in video/iframe tags
-                        if not url:
-                            src_links = regex.findall(r'(?:src|data-src)="(https?://[^\s"]+\.(?:m3u8|mp4|video)[^\s"]*)"', page_resp.text)
-                            if src_links:
-                                url = src_links[0]
-                
-                if url:
-                    streams.append({'title': title, 'url': url})
-                    downloaded += 1
-                else:
-                    i += 1
-                    continue
-            except requests.exceptions.RequestException:
-                pass
-            i += 1
-                    continue
-                
-                # Extract m3u8/mp4 URLs from page
-                page_text = page_resp.text
-                url = ''
-                
-                # Look for m3u8 or mp4 links
-                import re as regex
-                links = regex.findall(r'https?://[^\s"\']+\.(m3u8|mp4)[^\s"\']*', page_text)
-                if links:
-                    url = links[0]
-                
-                # Also check for video src attributes
-                if not url:
-                    src_links = regex.findall(r'src="(https?://[^\s"]+\.(m3u8|mp4)[^\s"]*)"', page_text)
-                    if src_links:
-                        url = src_links[0][0]
-                
+                if page_resp.status_code == 200:
+                    html = page_resp.text
+
+                    # Find m3u8/mp4 URLs in the page
+                    links = re.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', html)
+                    if links:
+                        url = links[0]
+
+                    # Check for iframe embeds
+                    if not url:
+                        iframes = re.findall(r'<iframe[^>]+src=["\']([^"\']+)["\']', html)
+                        for iframe_url in iframes:
+                            if '.m3u8' in iframe_url or '.mp4' in iframe_url:
+                                url = iframe_url
+                                break
+
+                    # Check for video src
+                    if not url:
+                        video_src = re.findall(r'<video[^>]+src=["\']([^"\']+)["\']', html)
+                        if video_src:
+                            url = video_src[0]
+
                 if url:
                     streams.append({'title': title, 'url': url})
                     downloaded += 1
@@ -298,5 +266,5 @@ def api_search():
         return jsonify({'streams': [], 'error': str(e)[:50]})
 
 if __name__ == '__main__':
-    print('SŌF TV - HLS Transcode + Fast HD Priority')
+    print('CineFlix - Movies & Series Streaming')
     app.run(host='0.0.0.0', port=8080, threaded=True, debug=False)
