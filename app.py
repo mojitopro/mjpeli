@@ -217,9 +217,9 @@ def api_search():
                 item_id = items[i]
                 title = data[item_id].get('title', item_id)
 
-                # Extract stream URL from movie/series page
+                # Extract stream URL from movie/series page at movies.cineflix.is
                 page_resp = session.get(
-                    f'https://cineflix.is/{item_id}/',
+                    f'https://movies.cineflix.is/watch/{item_id}/',
                     timeout=30
                 )
 
@@ -227,24 +227,17 @@ def api_search():
                 if page_resp.status_code == 200:
                     html = page_resp.text
 
-                    # Find m3u8/mp4 URLs in the page
-                    links = re.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', html)
-                    if links:
-                        url = links[0]
-
-                    # Check for iframe embeds
+                    # Extract player.how URL from iframe data-src
+                    import re as regex
+                    player_match = regex.search(r'data-src="(https?://player\.how[^"]+)"', html)
+                    if player_match:
+                        url = player_match.group(1)
+                    
+                    # If not found, try src attribute
                     if not url:
-                        iframes = re.findall(r'<iframe[^>]+src=["\']([^"\']+)["\']', html)
-                        for iframe_url in iframes:
-                            if '.m3u8' in iframe_url or '.mp4' in iframe_url:
-                                url = iframe_url
-                                break
-
-                    # Check for video src
-                    if not url:
-                        video_src = re.findall(r'<video[^>]+src=["\']([^"\']+)["\']', html)
-                        if video_src:
-                            url = video_src[0]
+                        player_match = regex.search(r'<iframe[^>]+src="(https?://player\.how[^"]+)"', html)
+                        if player_match:
+                            url = player_match.group(1)
 
                 if url:
                     streams.append({'title': title, 'url': url})
