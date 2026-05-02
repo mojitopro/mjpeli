@@ -66,48 +66,22 @@ def _start_hls(url, sid):
 
 @app.route('/')
 def index():
-    # Get trending movies and series
+    # Get recent movies and series using search API
     try:
         import re as regex
 
-        # Fetch trending movies page
-        movies_resp = session.get('https://cineflix.is/trending-movies/', timeout=30)
-        # Fetch trending series page
-        series_resp = session.get('https://cineflix.is/trending-series/', timeout=30)
+        # Search for recent content (2026 releases)
+        resp = session.get('https://cineflix.is/search/?query=2026', timeout=60)
 
-        # Extract movie and series IDs from the pages
-        movie_ids = regex.findall(r'href="https://movies\.cineflix\.is/watch/(mm\d+)/"', movies_resp.text)
-        series_ids = regex.findall(r'href="https://movies\.cineflix\.is/watch/(ss\d+)/"', series_resp.text)
+        if resp.status_code != 200:
+            return 'Error loading content', 500
 
-        # Fetch details for each movie to get title and IMDB ID
-        items = {}
+        try:
+            data = resp.json()
+        except:
+            return 'Error parsing content', 500
 
-        # Get movie details
-        for mid in movie_ids[:12]:
-            try:
-                # Fetch movie page to get IMDB ID
-                page_resp = session.get(f'https://movies.cineflix.is/watch/{mid}/', timeout=10)
-                imdb_match = regex.search(r'imdb_id=(tt\d+)', page_resp.text)
-                if imdb_match:
-                    imdb_id = imdb_match.group(1)
-                    title_match = regex.search(r'<h1>([^<]+)</h1>', page_resp.text)
-                    title = title_match.group(1) if title_match else mid
-                    items[mid] = {'title': title, 'imdb_id': imdb_id}
-            except:
-                pass
-
-        # Get series details
-        for sid in series_ids[:12]:
-            try:
-                page_resp = session.get(f'https://movies.cineflix.is/watch/{sid}/', timeout=10)
-                imdb_match = regex.search(r'imdb_id=(tt\d+)', page_resp.text)
-                if imdb_match:
-                    imdb_id = imdb_match.group(1)
-                    title_match = regex.search(r'<h1>([^<]+)</h1>', page_resp.text)
-                    title = title_match.group(1) if title_match else sid
-                    items[sid] = {'title': title, 'imdb_id': imdb_id}
-            except:
-                pass
+        items = list(data.keys())[:24]  # Get first 24 results
 
         # Build HTML
         html = '''<!DOCTYPE html>
@@ -127,32 +101,22 @@ h2 { color: #fff; margin: 20px 0 10px; }
 .card:hover .card-title { color: #b78a62; }
 </style></head><body>
 <div class="container">
-    <h1>CineFlix - Movies & Series</h1>
+    <h1>CineFlix - Recent Movies & Series 2026</h1>
 
-    <h2>Trending Movies</h2>
     <div class="grid">'''
 
-        # Add movies
-        for mid in movie_ids[:12]:
-            if mid in items:
-                title = items[mid]['title']
-                imdb_id = items[mid]['imdb_id']
-                html += f'<div class="card" onclick="location.href=\'/player?url={urllib.parse.quote(f"https://player.how/movie/?imdb_id={imdb_id}", safe="")}\'"><div class="card-body"><div class="card-title">{title}</div></div></div>'
-
-        html += '''</div><h2>Trending Series</h2><div class="grid">'''
-
-        # Add series
-        for sid in series_ids[:12]:
-            if sid in items:
-                title = items[sid]['title']
-                imdb_id = items[sid]['imdb_id']
-                html += f'<div class="card" onclick="location.href=\'/player?url={urllib.parse.quote(f"https://player.how/movie/?imdb_id={imdb_id}", safe="")}\'"><div class="card-body"><div class="card-title">{title}</div></div></div>'
+        # Add items
+        for item_id in items:
+            title = data[item_id].get('title', item_id)
+            # Extract IMDB ID from item_id (mm... or ss... -> tt...)
+            imdb_id = item_id.replace('mm', 'tt').replace('ss', 'tt')
+            html += f'<div class="card" onclick="location.href=\'/player?url={urllib.parse.quote("https://player.how/movie/?imdb_id=" + imdb_id, safe="")}\'"><div class="card-body"><div class="card-title">{title}</div></div></div>'
 
         html += '''</div></div>
 </body></html>'''
         return html
     except Exception as e:
-        return f'Error loading content: {str(e)[:100]}', 500
+        return f'Error: {str(e)[:100]}', 500
 
 @app.route('/player')
 def api_player():
