@@ -217,13 +217,49 @@ def api_search():
                 item_id = items[i]
                 title = data[item_id].get('title', item_id)
                 
-                # Fetch movie/series page
-                page_resp = session.get(
-                    f'https://cineflix.is/{item_id}/',
-                    timeout=30
+                # Try stream endpoint first (for TV-like content)
+                stream_resp = session.get(
+                    f'https://cineflix.is/stream/uuid/{item_id}/',
+                    timeout=30,
+                    allow_redirects=True
                 )
-                if page_resp.status_code != 200:
+                
+                url = ''
+                if stream_resp.status_code == 200 and '#EXTM3U' in stream_resp.text:
+                    # Extract M3U8 URL from stream response
+                    for line in stream_resp.text.splitlines():
+                        if M3U_URL_RE.match(line.strip()):
+                            url = line.strip()
+                            break
+                
+                # If stream endpoint fails, try movie page
+                if not url:
+                    page_resp = session.get(
+                        f'https://cineflix.is/{item_id}/',
+                        timeout=30
+                    )
+                    if page_resp.status_code == 200:
+                        # Extract m3u8/mp4 links from page HTML
+                        import re as regex
+                        # Find all m3u8/mp4 URLs in the page
+                        links = regex.findall(r'https?://[^\s"\'<>]+\.(m3u8|mp4)[^\s"\'<>]*', page_resp.text)
+                        if links:
+                            url = links[0]
+                        # Also check for src attributes in video/iframe tags
+                        if not url:
+                            src_links = regex.findall(r'(?:src|data-src)="(https?://[^\s"]+\.(?:m3u8|mp4|video)[^\s"]*)"', page_resp.text)
+                            if src_links:
+                                url = src_links[0]
+                
+                if url:
+                    streams.append({'title': title, 'url': url})
+                    downloaded += 1
+                else:
                     i += 1
+                    continue
+            except requests.exceptions.RequestException:
+                pass
+            i += 1
                     continue
                 
                 # Extract m3u8/mp4 URLs from page
