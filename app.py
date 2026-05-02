@@ -78,21 +78,13 @@ def api_player():
     if not url:
         return 'Missing URL', 400
     safe_url = url.replace('"', '\\"').replace("'", "\\'")
-    proxy_url = '/stream?url=' + urllib.parse.quote(url, safe='')
     return '''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>CineFlix</title>
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}video{width:100%;height:100%;background:#000}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
-<video id="v" playsinline webkit-playsinline controls></video>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000}iframe{width:100%;height:100%;border:none}#back{position:fixed;top:10px;left:10px;z-index:10;background:rgba(139,0,0,0.9);color:#fff;padding:12px 18px;border-radius:8px;font-size:18px;border:none}</style></head><body>
+<iframe id="player" src="''' + safe_url + '''" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
 <button id="back" onclick="history.back()">← Volver</button>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script><script>
-var v=document.getElementById("v");
-if(typeof Hls!=="undefined"&&Hls.isSupported()){
-    var h=new Hls({maxBufferLength:30});
-    h.loadSource("''' + proxy_url + '''");h.attachMedia(v);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){v.play().catch(function(){})});
-}else if(v.canPlayType("application/vnd.apple.mpegurl")){v.src="''' + proxy_url + '''";v.play().catch(function(){})}
-</script></body></html>'''
+</body></html>'''
 
 @app.route('/stream')
 def api_stream():
