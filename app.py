@@ -66,11 +66,93 @@ def _start_hls(url, sid):
 
 @app.route('/')
 def index():
-    ua = request.headers.get('User-Agent', '')
-    w = request.args.get('w', '')
-    if MOBILE_RE.search(ua) or w == 'm':
-        return send_file(os.path.join(BASE_DIR, 'mobile.html'))
-    return send_file(os.path.join(BASE_DIR, 'tv.html'))
+    # Get trending movies and series
+    try:
+        import re as regex
+
+        # Fetch trending movies page
+        movies_resp = session.get('https://cineflix.is/trending-movies/', timeout=30)
+        # Fetch trending series page
+        series_resp = session.get('https://cineflix.is/trending-series/', timeout=30)
+
+        # Extract movie and series IDs from the pages
+        movie_ids = regex.findall(r'href="https://movies\.cineflix\.is/watch/(mm\d+)/"', movies_resp.text)
+        series_ids = regex.findall(r'href="https://movies\.cineflix\.is/watch/(ss\d+)/"', series_resp.text)
+
+        # Fetch details for each movie to get title and IMDB ID
+        items = {}
+
+        # Get movie details
+        for mid in movie_ids[:12]:
+            try:
+                # Fetch movie page to get IMDB ID
+                page_resp = session.get(f'https://movies.cineflix.is/watch/{mid}/', timeout=10)
+                imdb_match = regex.search(r'imdb_id=(tt\d+)', page_resp.text)
+                if imdb_match:
+                    imdb_id = imdb_match.group(1)
+                    title_match = regex.search(r'<h1>([^<]+)</h1>', page_resp.text)
+                    title = title_match.group(1) if title_match else mid
+                    items[mid] = {'title': title, 'imdb_id': imdb_id}
+            except:
+                pass
+
+        # Get series details
+        for sid in series_ids[:12]:
+            try:
+                page_resp = session.get(f'https://movies.cineflix.is/watch/{sid}/', timeout=10)
+                imdb_match = regex.search(r'imdb_id=(tt\d+)', page_resp.text)
+                if imdb_match:
+                    imdb_id = imdb_match.group(1)
+                    title_match = regex.search(r'<h1>([^<]+)</h1>', page_resp.text)
+                    title = title_match.group(1) if title_match else sid
+                    items[sid] = {'title': title, 'imdb_id': imdb_id}
+            except:
+                pass
+
+        # Build HTML
+        html = '''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CineFlix - Movies & Series</title>
+<style>
+* { margin:0; padding:0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #000; color: #fff; }
+.container { max-width: 1200px; margin:0 auto; padding: 20px; }
+h1 { color: #b78a62; margin-bottom: 20px; }
+h2 { color: #fff; margin: 20px 0 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+.card { background: #111; border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+.card:hover { transform: scale(1.05); }
+.card-body { padding: 10px; }
+.card-title { font-size: 14px; margin-bottom: 5px; }
+.card:hover .card-title { color: #b78a62; }
+</style></head><body>
+<div class="container">
+    <h1>CineFlix - Movies & Series</h1>
+
+    <h2>Trending Movies</h2>
+    <div class="grid">'''
+
+        # Add movies
+        for mid in movie_ids[:12]:
+            if mid in items:
+                title = items[mid]['title']
+                imdb_id = items[mid]['imdb_id']
+                html += f'<div class="card" onclick="location.href=\'/player?url={urllib.parse.quote(f"https://player.how/movie/?imdb_id={imdb_id}", safe="")}\'"><div class="card-body"><div class="card-title">{title}</div></div></div>'
+
+        html += '''</div><h2>Trending Series</h2><div class="grid">'''
+
+        # Add series
+        for sid in series_ids[:12]:
+            if sid in items:
+                title = items[sid]['title']
+                imdb_id = items[sid]['imdb_id']
+                html += f'<div class="card" onclick="location.href=\'/player?url={urllib.parse.quote(f"https://player.how/movie/?imdb_id={imdb_id}", safe="")}\'"><div class="card-body"><div class="card-title">{title}</div></div></div>'
+
+        html += '''</div></div>
+</body></html>'''
+        return html
+    except Exception as e:
+        return f'Error loading content: {str(e)[:100]}', 500
 
 @app.route('/player')
 def api_player():
