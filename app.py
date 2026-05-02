@@ -99,6 +99,33 @@ def api_stream():
     url = request.args.get('url', '')
     if not url:
         return 'Missing URL', 400
+
+    # Handle player.how URLs
+    if 'player.how' in url:
+        try:
+            # Try to fetch the player page with browser-like headers
+            r = session.get(url, timeout=30, headers={
+                'Referer': 'https://movies.cineflix.is/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            })
+
+            if r.status_code == 200:
+                # Look for m3u8/mp4 URLs in the page
+                import re as regex
+                links = regex.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', r.text)
+                if links:
+                    # Return the first m3u8/mp4 URL found
+                    stream_url = links[0]
+                    return redirect(f'/stream?url={urllib.parse.quote(stream_url, safe="")}')
+
+            # If we can't extract the stream, return an error
+            return 'Unable to extract stream from player.how', 502
+        except:
+            return 'Error fetching player page', 502
+
+    # Handle regular m3u8 streams
     try:
         r = session.head(url, timeout=10, allow_redirects=True)
         ct = r.headers.get('Content-Type', '')
