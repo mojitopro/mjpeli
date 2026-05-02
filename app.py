@@ -139,30 +139,57 @@ def api_stream():
     if not url:
         return 'Missing URL', 400
 
-    # Handle player.how URLs
+    # Handle player.how URLs with Cloudflare bypass
     if 'player.how' in url:
         try:
-            # Try to fetch the player page with browser-like headers
-            r = session.get(url, timeout=30, headers={
-                'Referer': 'https://movies.cineflix.is/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-            })
+            import cloudscraper
+            from playwright.sync_api import sync_playwright
+            import re as regex
 
-            if r.status_code == 200:
-                # Look for m3u8/mp4 URLs in the page
-                import re as regex
-                links = regex.findall(r'https?://[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', r.text)
-                if links:
-                    # Return the first m3u8/mp4 URL found
-                    stream_url = links[0]
-                    return redirect(f'/stream?url={urllib.parse.quote(stream_url, safe="")}')
+            # Use cloudscraper to get Cloudflare cookies
+            scraper = cloudscraper.create_scraper()
+            scraper.get('https://player.how/', timeout=30)
 
-            # If we can't extract the stream, return an error
+            # Use playwright with cloudscraper cookies to render JavaScript
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                )
+
+                # Add cloudscraper cookies to playwright
+                for cookie in scraper.cookies:
+                    context.add_cookies([{
+                        'name': cookie.name,
+                        'value': cookie.value,
+                        'domain': cookie.domain,
+                        'path': cookie.path,
+                    }])
+
+                page = context.new_page()
+                page.goto(url, wait_until='networkidle', timeout=30000)
+
+                # Get the iframe src (which should be the stream URL)
+                iframe_src = page.get_attribute('iframe#player', 'src')
+                if not iframe_src:
+                    iframe_src = page.evaluate('''() => {
+                        const iframe = document.getElementById("player");
+                        return iframe ? iframe.src : null;
+                    }''')
+
+                browser.close()
+
+                if iframe_src and iframe_src.startswith('http'):
+                    # Check if it's an m3u8/mp4 URL
+                    if '.m3u8' in iframe_src or '.mp4' in iframe_src:
+                        return redirect(f'/stream?url={urllib.parse.quote(iframe_src, safe="")}')
+                    else:
+                        # It's another page, fetch it
+                        return redirect(f'/stream?url={urllib.parse.quote(iframe_src, safe="")}')
+
             return 'Unable to extract stream from player.how', 502
-        except:
-            return 'Error fetching player page', 502
+        except Exception as e:
+            return f'Error: {str(e)[:100]}', 502
 
     # Handle regular m3u8 streams
     try:
