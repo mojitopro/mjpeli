@@ -20,7 +20,7 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://cineflix.is/',
+    'Referer': 'https://searchtv.net/',
 }
 
 session = requests.Session()
@@ -107,7 +107,7 @@ def api_stream():
     if 'mpegurl' in ct or 'm3u8' in ct or 'x-mpegurl' in ct or url.endswith('.m3u8'):
         try:
             r = session.get(url, stream=True, timeout=30, headers={
-                'Referer': 'https://cineflix.is/',
+                'Referer': 'https://searchtv.net/',
                 'User-Agent': HEADERS['User-Agent']
             })
             if r.status_code != 200:
@@ -189,7 +189,7 @@ def api_search():
 
     try:
         resp = session.get(
-            f'https://cineflix.is/search/?query={urllib.parse.quote(q)}',
+            f'https://searchtv.net/search/?query={urllib.parse.quote(q)}',
             timeout=60
         )
 
@@ -214,37 +214,40 @@ def api_search():
 
         while downloaded < limit and i < len(items):
             try:
-                stream_resp = session.get(
-                    f'https://cineflix.is/stream/uuid/{items[i]}/',
+                item_id = items[i]
+                title = data[item_id].get('title', item_id)
+                
+                # Fetch movie/series page
+                page_resp = session.get(
+                    f'https://searchtv.net/{item_id}/',
                     timeout=30
                 )
-                if stream_resp.status_code != 200:
+                if page_resp.status_code != 200:
                     i += 1
                     continue
-
-                text = stream_resp.text
-                if '#EXTM3U' not in text:
-                    i += 1
-                    continue
-
-                title = data[items[i]].get('title', items[i])
+                
+                # Extract m3u8/mp4 URLs from page
+                page_text = page_resp.text
                 url = ''
-
-                for line in text.splitlines():
-                    if line.startswith('#EXTINF:'):
-                        parts = line.split(',', 1)
-                        if len(parts) > 1:
-                            raw = parts[1].strip().split('==>')[0].strip()
-                            clean = re.sub(r'\s*\(\d+\)\s*$', '', raw).strip()
-                            if clean:
-                                title = clean
-                    elif M3U_URL_RE.match(line.strip()):
-                        url = line.strip()
-                        break
-
+                
+                # Look for m3u8 or mp4 links
+                import re as regex
+                links = regex.findall(r'https?://[^\s"\']+\.(m3u8|mp4)[^\s"\']*', page_text)
+                if links:
+                    url = links[0]
+                
+                # Also check for video src attributes
+                if not url:
+                    src_links = regex.findall(r'src="(https?://[^\s"]+\.(m3u8|mp4)[^\s"]*)"', page_text)
+                    if src_links:
+                        url = src_links[0][0]
+                
                 if url:
                     streams.append({'title': title, 'url': url})
                     downloaded += 1
+                else:
+                    i += 1
+                    continue
             except requests.exceptions.RequestException:
                 pass
             i += 1
